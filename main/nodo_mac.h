@@ -1,0 +1,15 @@
+#ifndef NODO_MAC_H
+#define NODO_MAC_H
+
+#define MAC_BYTES               6    // Número de bytes que conforman la dirección MAC
+
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include "esp_err.h"
+#include "esp_system.h"
+#include "esp_log.h"
+
+const char *nodo_get_mac();
+
+#endif

@@ -1,0 +1,85 @@
+menu "IPN-NODO Menu"
+    config TIMEZONE
+        string "Zona horaria para sincronizar el dispositivo"
+        default "UTC"
+    menu "WiFi"
+        config MAX_AP_SCAN_SIZE
+            int "Máx. número de estaciones que se pueden descubrir"
+            default 10
+            help 
+                Máximo número de estaciones que pueden ser enviadas a la aplicación
+                móvil al momento de buscar un punto de acceso WiFi en la secuencia de
+                inicio del dispositivo
+        config MAX_SCAN_ATTEMPTS
+            int "Máx. número de intentos para escanear puntos de acceso"
+            default 5
+            help 
+                Al buscar puntos de acceso en la secuencia de inicio, en caso de que en el 
+                primer intento no se haya encontrado al menos un PA, se harán a lo más
+                MAX_SCAN_ATTEMPTS intentos para encontrar al menos un PA, en caso contrario,
+                se notificará a la aplicación que los intentos fueron agotados
+        config MAX_CONNECT_ATTEMPTS
+            int "Máx. número de intentos para conectarse a un punto de acceso"
+            default 8
+            help 
+                Al tratar de conectarse a un punto de acceso, se intentara esta operación al
+                menos MAX_CONNECT_ATTEMPTS veces para poder conseguir una direcicón IP. De lo
+                contrario, se notificará a la aplicación.
+    endmenu
+
+    menu "Sensores"
+        config MEASURE_RATE_MS
+        int "Periodo para realizar medidas (ms)"
+        default 2000
+        help 
+            Número de milisegundos que hay entre cada toma de mediciones
+            así como el envío de estos datos a los servicios web. Esto se
+            mide en milisegundos
+        config SAMPLES
+            int "Número de muestras tomadas al realizar una medición"
+            default 64
+        config VREF
+            int "Voltage de referencia para el ADC (V)"
+            default 1100
+        config TSL2561_ENABLED
+            bool "Utilizar el sensor TSL2561"
+            default n
+    endmenu
+
+    menu "Colas (Queues)"
+        config SPP_QUEUE_LEN
+        int "Número de espacios para la cola de mensajes Bluetooth SPP"
+        default 4
+        help 
+            Número de estructuras de datos de tipo spp_msg_t que puede almacenar la cola usada para
+            el envío de mensajes Bluetooth SPP
+        config WS_QUEUE_LEN
+        int "Número de espacios para la cola de mensajes WebSocket"
+        default 6
+        help
+            Número de estructuras de datos de tipo ws_queue_msg_t que puede almacenar la cosa usada
+            para en envío de mensajes a traves del WebSocket
+    endmenu
+
+    menu "Protocolos Web"
+        config WEB_USER_AGENT
+            string "Valor de la cabecera User-Agent para las peticiones HTTP/WS"
+            default "ESP32-HTTP-Client"
+        config SERVER_URL
+            string "Dirección base de los servicios Web"
+            default "127.0.0.1"
+            help 
+                Dirección del servidor web como direcicón IPv4 o como dominio e.g 192.168.1.65 o 
+                ipn.mx
+        menu "HTTP"
+            config HTTP_PORT
+            int "Puerto para peticiones HTTP"
+            default 80
+        endmenu
+        menu "WebSocket"
+            config WEBSOCKET_PORT
+            int "Puerto para conexiones por medio de Websockets"
+            default 80
+        endmenu
+    endmenu
+endmenu
