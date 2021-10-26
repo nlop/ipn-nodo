@@ -98,3 +98,7 @@ managed_components
 # Backups, old files
 *.bk
 *.old
+
+# sdkconfig
+sdkconfig
+sdkconfig.old
