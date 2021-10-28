@@ -30,7 +30,7 @@ void nodo_bt_init() {
      * Obtener la memoria para el controlador de bluettoth utilizando el modo BLE
      * -> Obtener en modo BLE, sí se libera en BT Classic puede generar problemas
      */
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
+    //ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
 
     // Obtener la configuración predefinida para el controlador BT
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();

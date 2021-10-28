@@ -52,6 +52,11 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     close_init_comms(send_task_handle, recv_task_handle);
 }
 
+void nodo_init_ble(const EventGroupHandle_t evt_group) {
+    nodo_bt_init();
+    init_gatt_service(evt_group);
+}
+
 /*
  * Implementación de la capa de aplicación para recibir los mensajes de la cola
  * de entrada (recv) de los mensajes SPP para la inicialización

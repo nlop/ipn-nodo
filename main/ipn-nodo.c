@@ -9,11 +9,14 @@
 #include "measure.h"
 #include "esp_sntp.h"
 #include "nodo_mac.h"
+#include "nodo_ble.h"
 
 #define MAIN_TAG "MAIN"
+#define GATT_MODE   true
+enum conn_type_t { CONN_TYPE_GATT, CONN_TYPE_WEBSOCKET };
 
 // Declaraciones
-int start(const EventGroupHandle_t evt_group);
+int start(enum conn_type_t dev_type, const EventGroupHandle_t evt_group);
 void start_notify_connected_cb(EventGroupHandle_t evt_group, bool connected);
 void sync_time();
 
@@ -26,7 +29,7 @@ void app_main(void) {
      *      se puede conectar con las credenciales guardadas [X]
      */
     // TODO: Revisar función
-    nodo_get_mac();
+    //nodo_get_mac();
     // Inicializar y verificar almacenamiento no-volatil (NVS)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -42,6 +45,13 @@ void app_main(void) {
         ESP_LOGE(MAIN_TAG, "app_main: Error creando event group");
         return;
     }
+#if GATT_MODE
+    ESP_LOGI(MAIN_TAG, "Inicializando BLE GATT mode!");
+    nodo_init_ble(nodo_evt_group); 
+    ESP_LOGI(MAIN_TAG, "app_main: Arrancando tareas...");
+    start(CONN_TYPE_GATT, nodo_evt_group);
+#else
+    ESP_LOGI(MAIN_TAG, "Inicializando WiFi mode!");
     /*
      * Buscar en la NVS las llaves NVS_AP_PART.AP_SSID/AP_PSK para saber si la
      * estación ha sido inicializada anteriormente
@@ -59,9 +69,11 @@ void app_main(void) {
     // Sincronizar el tiempo con NTP
     sync_time();
     ESP_LOGI(MAIN_TAG, "app_main: Arrancando tareas...");
-    start(nodo_evt_group);
+    start(CONN_TYPE_WEBSOCKET, nodo_evt_group);
+#endif
     ESP_LOGI(MAIN_TAG, "app_main: Listo!");
 }
+
 /*
  * Arrancar las tareas normales de envío de datos y medición
  *
@@ -69,37 +81,57 @@ void app_main(void) {
  *      evt_group: Handle para el grupo de eventos que marca eventos relevantes
  *      del nodo
  */
-int start(const EventGroupHandle_t evt_group) {
-    QueueHandle_t ws_queue_out;
+int start(enum conn_type_t conn_type, const EventGroupHandle_t evt_group) {
+    QueueHandle_t queue_out;
     TaskHandle_t ws_task_handle, meas_task_handle;
     BaseType_t ret;
-    // Leer token para servicios web
-    uint8_t *token;
-    if ( (token = nvs_get_token()) == NULL) {
-        ESP_LOGE(MAIN_TAG, "start: Error leyendo token");
-        return -1;
-    }
-    ws_queue_out = xQueueCreate(WS_QUEUE_LEN, sizeof(ws_queue_msg_t));
-    // Arrancar Task WEBSOCKET 
-    ws_task_arg_t *ws_arg = (ws_task_arg_t *) calloc(1, sizeof(ws_task_arg_t));
-    ws_arg->token = token;
-    ws_arg->nodo_evt_group = evt_group;
-    ws_arg->out_queue = ws_queue_out;
-    ret = xTaskCreate(
-            websocket_task, 
-            "websocket_task", 
-            configMINIMAL_STACK_SIZE * 4,
-            (void *) ws_arg,
-            5,
-            &ws_task_handle);
-    if (ret == pdFALSE) {
-        ESP_LOGE(MAIN_TAG, "start: Error creando websocket_task");
-        return -1;
+    if (conn_type == CONN_TYPE_WEBSOCKET) {
+        ESP_LOGD(MAIN_TAG, "Arrancado task WebSocket...");
+        // Leer token para servicios web
+        uint8_t *token;
+        if ( (token = nvs_get_token()) == NULL) {
+            ESP_LOGE(MAIN_TAG, "start: Error leyendo token");
+            return -1;
+        }
+        queue_out = xQueueCreate(WS_QUEUE_LEN, sizeof(ws_queue_msg_t));
+        // Arrancar Task WEBSOCKET 
+        ws_task_arg_t *ws_arg = (ws_task_arg_t *) calloc(1, sizeof(ws_task_arg_t));
+        ws_arg->token = token;
+        ws_arg->nodo_evt_group = evt_group;
+        ws_arg->out_queue = queue_out;
+        ret = xTaskCreate(
+                websocket_task, 
+                "websocket_task", 
+                configMINIMAL_STACK_SIZE * 4,
+                (void *) ws_arg,
+                5,
+                &ws_task_handle);
+        if (ret == pdFALSE) {
+            ESP_LOGE(MAIN_TAG, "%s: Error creando websocket_task", __func__);
+            return -1;
+        }
+    } else {
+        ESP_LOGD(MAIN_TAG, "Arrancado task GATT...");
+        queue_out = xQueueCreate(GATT_QUEUE_LEN, sizeof(ws_queue_msg_t));
+        gatt_task_arg_t *gatt_arg = (gatt_task_arg_t *) calloc(1, sizeof(gatt_task_arg_t));
+        gatt_arg->nodo_evt_group = evt_group;
+        gatt_arg->out_queue = queue_out;
+        ret = xTaskCreate(
+                gatt_task, 
+                "gatt_task", 
+                configMINIMAL_STACK_SIZE * 4,
+                (void *) gatt_arg,
+                5,
+                &ws_task_handle);
+        if (ret == pdFALSE) {
+            ESP_LOGE(MAIN_TAG, "start: Error creando websocket_task");
+            return -1;
+        }
     }
     // Arrancar Task MEASURE
     meas_task_arg_t *meas_arg = (meas_task_arg_t *) calloc(1, sizeof(meas_task_arg_t));
     meas_arg->nodo_evt_group = evt_group;
-    meas_arg->out_queue = ws_queue_out;
+    meas_arg->out_queue = queue_out;
     ret = xTaskCreate(
             measure_task, 
             "measure_task", 
@@ -108,7 +140,7 @@ int start(const EventGroupHandle_t evt_group) {
             5,
             &meas_task_handle);
     if (ret == pdFALSE) {
-        ESP_LOGE(MAIN_TAG, "start: Error creando measure_task");
+        ESP_LOGE(MAIN_TAG, "%s: Error creando measure_task",__func__);
         return -1;
     }
     //TODO: Liberar token, task_arg en salida limpia

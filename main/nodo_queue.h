@@ -6,8 +6,9 @@
 #include "measure.h"
 
 /** Message Queues **/
-#define SPP_QUEUE_LEN   CONFIG_SPP_QUEUE_LEN
-#define WS_QUEUE_LEN    CONFIG_WS_QUEUE_LEN
+#define SPP_QUEUE_LEN       CONFIG_SPP_QUEUE_LEN
+#define WS_QUEUE_LEN        CONFIG_WS_QUEUE_LEN
+#define GATT_QUEUE_LEN      5
 
 /** Enums **/
 enum spp_msg_type_t { 
