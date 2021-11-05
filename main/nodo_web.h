@@ -20,12 +20,9 @@
 #define WSTASK_TAG          "WS TASK"
 #define NODO_USER_AGENT     CONFIG_WEB_USER_AGENT
 #define SERVER_URL          CONFIG_SERVER_URL
-#define HTTP_URL_PREFIX     "http://"
-#define WS_URL_PREFIX       "ws://"
-#define HTTP_BASE_URL       HTTP_URL_PREFIX SERVER_URL
-#define INIT_ENDPOINT       "/dev/new"
-#define TOKEN_INIT_URL      HTTP_BASE_URL INIT_ENDPOINT
-#define WEBSOCKET_URL       WS_URL_PREFIX SERVER_URL
+#define HTTP_HOST           SERVER_URL
+#define INIT_PATH           "/dev/new"
+#define WEBSOCKET_HOST      SERVER_URL
 
 #if CONFIG_WEBSOCKET_PORT != 80
 #define WEBSOCKET_PORT      CONFIG_WEBSOCKET_PORT

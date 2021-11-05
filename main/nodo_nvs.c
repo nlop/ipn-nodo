@@ -13,19 +13,19 @@
  */
 int nvs_save_wifi_credentials(char *ssid, char *psk) {
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open(NVS_AP_PART, NVS_READWRITE, &nvs_handle);
+    esp_err_t ret = nvs_open(AP_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "Error abriendo partición: %s", NVS_AP_PART);
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo %s [code %s]", __func__, AP_NAMESPACE, esp_err_to_name(ret));
         return -1;
     }
     ret = nvs_set_str(nvs_handle, AP_SSID, ssid);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "Error guardando %s [%s]",AP_SSID, ssid);
+        ESP_LOGE(NVS_TAG, "%s: Error guardando %s [code %s]",__func__, AP_SSID, esp_err_to_name(ret));
         return -1;
     }
     ret = nvs_set_str(nvs_handle, AP_PSK, psk);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "Error guardando %s [%s]", AP_PSK, psk);
+        ESP_LOGE(NVS_TAG, "%s: Error guardando %s [code %s]", __func__, AP_PSK, esp_err_to_name(ret));
         return -1;
     }
     // Esperar a que se llame nvs_save_token() para guardar las credenciales
@@ -38,12 +38,21 @@ int nvs_save_wifi_credentials(char *ssid, char *psk) {
     return 0;
 }
 
+/*
+ * Obtener las credenciales WiFi, almacenadas en el almacenamiento NVS
+ * 
+ * Argumentos:
+ *      ssid : Puntero doble indicando una región de memoria para almacenar el
+ *      valor del SSID
+ *      psk : Puntero doble indicando una región de memoria para almacenar el
+ *      valor de la PSK
+ */
 int nvs_get_wifi_credentials(uint8_t **ssid, uint8_t **psk) {
     nvs_handle_t nvs_handle;
     size_t str_len;
-    esp_err_t ret = nvs_open(NVS_AP_PART, NVS_READONLY, &nvs_handle);
+    esp_err_t ret = nvs_open(AP_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "Error abriendo partición NVS_AP_PART");
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo %s [code %s]", __func__, AP_NAMESPACE, esp_err_to_name(ret));
         return -1;
     }
     // SSID
@@ -52,6 +61,7 @@ int nvs_get_wifi_credentials(uint8_t **ssid, uint8_t **psk) {
     *ssid = calloc(str_len, sizeof(uint8_t));
     ret = nvs_get_str(nvs_handle, AP_SSID, (char *) *ssid, &str_len);
     if (ret != ESP_OK) { 
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo %s [code %s]", __func__, AP_SSID, esp_err_to_name(ret));
         free(*ssid);
         return -1; 
     }
@@ -61,6 +71,7 @@ int nvs_get_wifi_credentials(uint8_t **ssid, uint8_t **psk) {
     ssid = calloc(str_len, sizeof(uint8_t));
     ret = nvs_get_str(nvs_handle, AP_PSK, (char *) *psk, &str_len);
     if (ret != ESP_OK) { 
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo %s [code %s]", __func__, AP_PSK, esp_err_to_name(ret));
         free(*ssid);
         free(*psk);
         return -1; 
@@ -69,46 +80,61 @@ int nvs_get_wifi_credentials(uint8_t **ssid, uint8_t **psk) {
     nvs_close(nvs_handle);
 }
 
+/*
+ *  Guardar el token para servicios web en la memoria NVS
+ *
+ *  Argumentos:
+ *      token: Puntero al arreglo de carácteres que representan al token
+ *  Retorno:
+ *      En ejecución exitosa 0, de lo contrario -1.
+ */
 int nvs_save_token(char *token) {
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open(NVS_TOKEN_PART, NVS_READWRITE, &nvs_handle);
+    esp_err_t ret = nvs_open(TOKEN_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "Error abriendo partición: %s", NVS_TOKEN_PART);
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo partición: %s [code %s]", __func__, TOKEN_NAMESPACE, esp_err_to_name(ret));
         return -1;
     }
     ret = nvs_set_str(nvs_handle, TOKEN, token);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "Error guardando %s [%s]", TOKEN, token);
+        ESP_LOGE(NVS_TAG, "%s: Error guardando %s [code %s]", __func__,TOKEN, esp_err_to_name(ret));
         return -1;
     }
     ret = nvs_commit(nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "Error ejecutando registros");
+        ESP_LOGE(NVS_TAG, "%s: Error ejecutando registros [code %s]", __func__, esp_err_to_name(ret));
         return -1;
     }
     nvs_close(nvs_handle);
     return 0;
 }
 
+/*
+ *  Obtener el valor del token, almacenado en la memoria NVS
+ *
+ *  Retorno:
+ *      Puntero a un arreglo de bytes (uint8_t) a una región de memoria
+ *      dinámica donde se encuentra el token. NULL en caso de algún error
+ */
 uint8_t *nvs_get_token() {
     nvs_handle_t nvs_handle;
     uint8_t *token;
     size_t str_len;
-    esp_err_t ret = nvs_open(NVS_TOKEN_PART, NVS_READONLY, &nvs_handle);
+    esp_err_t ret = nvs_open(TOKEN_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "nvs_get_token: Error abriendo partición %s", NVS_TOKEN_PART);
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo partición %s [code %s]", __func__, TOKEN_NAMESPACE, esp_err_to_name(ret));
         return NULL;
     }
     // Leer token
     ret = nvs_get_str(nvs_handle, TOKEN, NULL, &str_len);
-    if (ret != ESP_OK) { 
-        ESP_LOGE(NVS_TAG, "nvs_get_token: Error leyendo longitud de token");
+    if (ret != ESP_OK) {
+        ESP_LOGE(NVS_TAG, "%s: Error leyendo longitud de token [code %s]", __func__, esp_err_to_name(ret));
         return NULL; 
     }
     token = (uint8_t *) calloc(str_len, sizeof(uint8_t));
     ret = nvs_get_str(nvs_handle, TOKEN, (char *) token, &str_len);
-    if (ret != ESP_OK) { 
-        ESP_LOGE(NVS_TAG, "nvs_get_token: Error leyendo token");
+    if (ret != ESP_OK) {
+        ESP_LOGE(NVS_TAG, "%s: Error leyendo token [code %s]", __func__, esp_err_to_name(ret));
         free(token);
         return NULL; 
     }
@@ -120,8 +146,8 @@ int nvs_set_mode(uint8_t mode) {
     nvs_handle_t nvs_handle;
     esp_err_t ret = nvs_open(NVS_DEV_TYPE_NS, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, ":%s: Error abriendo partición: %s [%s]", 
-                __func__, NVS_DEV_TYPE_NS, esp_err_to_name(ret));
+        ESP_LOGE(NVS_TAG, ":%s: Error abriendo namespace: %s [code %s]", 
+                __func__, DEV_TYPE_NAMESPACE, esp_err_to_name(ret));
         return -1;
     }
     ret = nvs_set_u8(nvs_handle, DEV_TYPE, mode);
@@ -132,7 +158,7 @@ int nvs_set_mode(uint8_t mode) {
     }
     ret = nvs_commit(nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "%s: Error ejecutando registros [%s]", __func__, esp_err_to_name(ret));
+        ESP_LOGE(NVS_TAG, "%s: Error ejecutando registros [code %s]", __func__, esp_err_to_name(ret));
         return -1;
     }
     nvs_close(nvs_handle);
@@ -142,16 +168,15 @@ int nvs_set_mode(uint8_t mode) {
 uint8_t nvs_get_mode(void) {
     nvs_handle_t nvs_handle;
     uint8_t dev_type;
-    esp_err_t ret = nvs_open(NVS_DEV_TYPE_NS, NVS_READONLY, &nvs_handle);
+    esp_err_t ret = nvs_open(DEV_TYPE_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, "%s: Error abriendo partición %s [%s]" 
-                ,__func__, NVS_TOKEN_PART, esp_err_to_name(ret));
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo namespace %s [code %s]" 
+                ,__func__, DEV_TYPE_NAMESPACE , esp_err_to_name(ret));
         return 0;
     }
-    // Leer token
-    ret = nvs_get_u8(nvs_handle, TOKEN, &dev_type);
+    ret = nvs_get_u8(nvs_handle, DEV_TYPE, &dev_type);
     if (ret != ESP_OK) { 
-        ESP_LOGE(NVS_TAG, "nvs_get_token: Error leyendo longitud de token");
+        ESP_LOGE(NVS_TAG, "%s: Error leyendo %s", __func__, DEV_TYPE);
         return 0; 
     }
     nvs_close(nvs_handle);

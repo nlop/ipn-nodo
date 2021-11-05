@@ -21,7 +21,7 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     nodo_event_group = event_group;
     /*** Bluetooth ***/
     nodo_bt_init();
-    spp_init_ret_t ret = nodo_bt_spp_init(nodo_spp_init_recv_sb);
+    spp_init_ret_t ret = nodo_bt_spp_init(nodo_spp_init_recv_cb);
     if ( ret.status != 0 ) {
         ESP_LOGE(INIT_TAG, "nodo_init_dev: Error arrancando BT SPP!");
         return;
@@ -121,8 +121,6 @@ void send_init_token(uint8_t *token) {
     xQueueSendToBack(queue_out, &msg, portMAX_DELAY);
     memset(&msg, 0, sizeof(spp_msg_t));
     // Recibir el token y mandar una petición web 
-    //ESP_ERROR_CHECK(esp_read_mac( (uint8_t*) &mac_nodo, ESP_MAC_BT));
-    //get_mac_str((uint8_t *) mac_nodo, (uint8_t *) mac_nodo_str);
     const char *mac_addr = nodo_get_mac();
     uint8_t i = 0;
     while (i < MAX_SEND_ATTEMPTS) {
@@ -143,6 +141,8 @@ void send_init_token(uint8_t *token) {
             ESP_LOGI(WEB_TAG, "Conexión con servidor falló!");
             msg.type = MSG_SERV_CONN_FAIL;
         }
+        /* Esperar un poquito */
+        vTaskDelay(pdMS_TO_TICKS(500));
         ESP_LOGI(WEB_TAG, "Reintentando...");
     }
     xQueueSendToBack(queue_out, &msg, portMAX_DELAY);
@@ -170,7 +170,7 @@ void send_ap_scanned(nodo_ap_scan_results_t *results) {
     xQueueSendToBack(queue_out, &msg_aps, portMAX_DELAY);
 }
 
-/*
+/**
  * - Enviar el mensaje de notificación de conexión exitosa a internet,
  * a la aplicación móvil. 
  * - Guardar los datos en la memoria flash
@@ -185,7 +185,6 @@ void init_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
         xEventGroupSetBits(evt_group, WIFI_OK);
         // Guardar SSID/PSK en NVS
         ESP_LOGI(INIT_TAG, "Guardando credenciales...");
-        // Quitar comentario para guardar credenciales --->
         int ret = nvs_save_wifi_credentials((char *) ssid, (char *) psk);
         if ( ret != 0 ) {
             ESP_LOGE(INIT_TAG, "Error guardando credenciales...");
@@ -200,7 +199,7 @@ void init_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
      xQueueSendToBack(queue_out, &msg_conn_ok, portMAX_DELAY);
 }
 
-/*
+/**
  * Cerrar los canales de comunicación Buetooth SPP utilizados para la
  * inicialización del dispositivo
  * Argumentos:

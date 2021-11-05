@@ -15,9 +15,11 @@ char *get_timestamp();
  * Configuración del cliente HTTP para enviar el token
  */
 esp_http_client_config_t config = {
-    .url = TOKEN_INIT_URL,
+    .host = HTTP_HOST,
+    .path = INIT_PATH,
     .event_handler = nodo_http_init_handler,
     .user_agent = NODO_USER_AGENT,
+    .transport_type = HTTP_TRANSPORT_OVER_TCP,
 #ifdef HTTP_PORT
     .port = HTTP_PORT
 #endif
@@ -29,7 +31,7 @@ esp_http_client_config_t config = {
  */
 token_ret_t http_send_token(uint8_t *token, const char *mac) {
     token_ret_t ret = {0};
-    ESP_LOGI(WEB_TAG, "Enviando Token : %s, MAC: %s", token, mac);
+    ESP_LOGD(WEB_TAG, "%s: Enviando Token : %s, MAC: %s", __func__, token, mac);
     // Crear cadena JSON
     // TODO: Cambiar al nuevo formato gral
     cJSON *json_obj = cJSON_CreateObject();
@@ -39,7 +41,7 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     cJSON_AddItemToObject(json_obj, "mac", mac_val);
     char *post_data = cJSON_PrintUnformatted(json_obj);
     cJSON_Delete(json_obj);
-    ESP_LOGI(WEB_TAG, "Body : %s", post_data);
+    ESP_LOGD(WEB_TAG, "%s: Body : %s",__func__, post_data);
     // Preparar cliente HTTP
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_http_client_set_method(client, HTTP_METHOD_POST);
@@ -50,8 +52,8 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     if (err == ESP_OK) {
         ret.http_status = esp_http_client_get_status_code(client);
         uint8_t res_len = esp_http_client_get_content_length(client);
-        ESP_LOGI(WEB_TAG, "HTTP POST Status = %d, content_length = %d",
-                esp_http_client_get_status_code(client), res_len);
+        ESP_LOGI(WEB_TAG, "%s: HTTP POST Status = %d, content_length = %d",
+                __func__, esp_http_client_get_status_code(client), res_len);
         //esp_log_buffer_hex(WEB_TAG, response_body, response_len);
         response_body = (uint8_t *) reallocarray(response_body, response_len + 1, sizeof(uint8_t));
         if (response_body != NULL) {
@@ -59,13 +61,13 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
             ret.esp_status = ESP_OK; 
             ret.token = response_body;
         } else {
-            ESP_LOGE(WEB_TAG, "Error reordenando memoria para token");
+            ESP_LOGE(WEB_TAG, "%s: Error reordenando memoria para token", __func__);
             free(response_body);
         }
         response_len = 0;
         response_body = NULL;
     } else {
-        ESP_LOGE(WEB_TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+        ESP_LOGE(WEB_TAG, "%s: HTTP POST request failed: %s", __func__, esp_err_to_name(err));
         ret.esp_status = ESP_FAIL;
     }
     free(post_data);
@@ -121,11 +123,14 @@ void websocket_task(void *pvParameters) {
     xEventGroupWaitBits(arg->nodo_evt_group, WIFI_OK, pdFALSE, pdTRUE, portMAX_DELAY);
     ESP_LOGI(WSTASK_TAG, "Preparando WebSocket...");
     // Configurar cliente WebSocket
-    esp_websocket_client_config_t websocket_cfg = { .user_agent = NODO_USER_AGENT };
-    websocket_cfg.uri = WEBSOCKET_URL;
+    esp_websocket_client_config_t websocket_cfg = { 
+        .user_agent = NODO_USER_AGENT,
+        .host = WEBSOCKET_HOST,
+        .transport = WEBSOCKET_TRANSPORT_OVER_TCP,
 #ifdef WEBSOCKET_PORT
-    websocket_cfg.port = WEBSOCKET_PORT;
+        .port = WEBSOCKET_PORT
 #endif
+    };
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&websocket_cfg);
     // Registrar handler para WEBSOCKET_EVENT_CONNECTED/DISCONNECTED
     esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_CONNECTED, ws_evt_handler_conn, (void *) &(arg->nodo_evt_group));
