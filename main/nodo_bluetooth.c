@@ -30,7 +30,7 @@ void nodo_bt_init() {
      * Obtener la memoria para el controlador de bluettoth utilizando el modo BLE
      * -> Obtener en modo BLE, sí se libera en BT Classic puede generar problemas
      */
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
+    //ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
 
     // Obtener la configuración predefinida para el controlador BT
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
@@ -161,13 +161,6 @@ void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
             esp_log_buffer_hex(BT_TAG ,param->data_ind.data,param->data_ind.len);
             // Accionar el callback pasado a la función
             spp_recv_cb(spp_queue_in, param);
-            // Mover a la capa de aplicación --->
-            /* 
-            if ( SSID != NULL && PSK != NULL) {
-            ESP_LOGI(BT_TAG, "Iniciando stack WiFi\n\tSSID = %s\n\tPSK = %s", SSID, PSK);
-            //wifi_init_sta(SSID, PSK);
-            }
-            esp_spp_write(param->write.handle, strlen(spp_data), (uint8_t *)spp_data); */
             break;
         case ESP_SPP_CONG_EVT:
             ESP_LOGI(BT_TAG, "ESP_SPP_CONG_EVT");
@@ -216,8 +209,10 @@ void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     }
 }
 
-/*********** Función de lectura (recv) para la inicialización (init) -- capa protocolo ***********/
-void nodo_spp_init_recv_sb(QueueHandle_t queue, esp_spp_cb_param_t *param) { 
+/**
+ * Función de lectura (recv) para la inicialización (init) -- capa protocolo
+ */
+void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param) { 
     spp_msg_t msg = {0};
     if (param->data_ind.len > 0 ) {
         switch( param->data_ind.data[0] ) {

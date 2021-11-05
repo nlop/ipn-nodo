@@ -39,7 +39,7 @@ spp_init_ret_t nodo_bt_spp_init(nodo_spp_recv_cb recv_cb);
 void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param);
 void esp_bt_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param);
 void nodo_init_read_task(void *pvParameters);
-void nodo_spp_init_recv_sb(QueueHandle_t queue, esp_spp_cb_param_t *param);
+void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param);
 uint8_t *copy_msg(uint8_t len, uint8_t *src);
 void nodo_init_send_task(void *pvParameters);
 byte_buffer_t nodo_ap_data_prepare(wifi_ap_record_t *ap_record);
