@@ -46,6 +46,8 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
             pdTRUE,
             portMAX_DELAY);
     ESP_LOGI(INIT_TAG, "nodo_init_dev: Listo para cerrar SPP!");
+    /* Guardar tipo de dispositivo (WiFi) */
+    nvs_set_mode(NODO_WIFI);
     // Esperar para que la aplicación cierre la conexión de forma ordinaria
     vTaskDelay(pdMS_TO_TICKS(APP_DISCONNECT_TIMEOUT));
     // Cerrar canales BT SPP de inicialización

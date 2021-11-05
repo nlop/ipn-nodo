@@ -15,6 +15,7 @@
 #include "nodo_events.h"
 #include "nodo_nvs.h"
 #include "nodo_mac.h"
+#include "nodo_def.h"
 
 
 #define INIT_TAG        "NODO INIT"

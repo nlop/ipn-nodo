@@ -39,39 +39,51 @@ void app_main(void) {
     }
 
     ESP_ERROR_CHECK( ret );
-    // Crear EventGroup para eventos del nodo
+    /* Crear EventGroup para eventos del nodo */
     EventGroupHandle_t nodo_evt_group = xEventGroupCreate();
     if (nodo_evt_group == NULL) {
         ESP_LOGE(MAIN_TAG, "app_main: Error creando event group");
         return;
     }
-#if GATT_MODE
-    ESP_LOGI(MAIN_TAG, "Inicializando BLE GATT mode!");
-    nodo_init_ble(nodo_evt_group); 
-    ESP_LOGI(MAIN_TAG, "app_main: Arrancando tareas...");
-    start(CONN_TYPE_GATT, nodo_evt_group);
-#else
-    ESP_LOGI(MAIN_TAG, "Inicializando WiFi mode!");
-    /*
-     * Buscar en la NVS las llaves NVS_AP_PART.AP_SSID/AP_PSK para saber si la
-     * estación ha sido inicializada anteriormente
-     */
-    uint8_t *ssid, *psk;
-    if ( nvs_get_wifi_credentials(&ssid, &psk) == 0 ) {
-        ESP_LOGI(MAIN_TAG, "Credenciales guardadas %s : %s", ssid, psk);
-        ESP_LOGI(MAIN_TAG, "Inicializando estación: normal boot");
-        nodo_wifi_init(start_notify_connected_cb, nodo_evt_group);
-        nodo_wifi_set_credentials(ssid, psk);
+    /* Buscar el tipo de dispositivo */
+    uint8_t dev_type = nvs_get_mode();
+    if (dev_type == NODO_WIFI) {
+        ESP_LOGI(MAIN_TAG, "Inicializando WiFi mode!");
+        /*
+         * Buscar en la NVS las llaves NVS_AP_PART.AP_SSID/AP_PSK para saber si la
+         * estación ha sido inicializada anteriormente
+         */
+        uint8_t *ssid, *psk;
+        if ( nvs_get_wifi_credentials(&ssid, &psk) == 0 ) {
+            ESP_LOGI(MAIN_TAG, "Credenciales guardadas %s : %s", ssid, psk);
+            ESP_LOGI(MAIN_TAG, "Inicializando estación: normal boot");
+            nodo_wifi_init(start_notify_connected_cb, nodo_evt_group);
+            nodo_wifi_set_credentials(ssid, psk);
+            /* Sincronizar el tiempo con NTP */
+            sync_time();
+            ESP_LOGI(MAIN_TAG, "%s: Arrancando tareas...", __func__);
+            //start(CONN_TYPE_WEBSOCKET, nodo_evt_group);
+        } else {
+            ESP_LOGI(MAIN_TAG, "No se ha configurado!\nInicializando estación: first boot...");
+            nodo_init_dev(nodo_evt_group);
+        }
+    } else if (dev_type == NODO_BLE) {
+        ESP_LOGI(MAIN_TAG, "Inicializando BLE GATT mode!");
+        nodo_init_ble(nodo_evt_group); 
     } else {
-        ESP_LOGI(MAIN_TAG, "No hay credenciales guardadas!\nInicializando estación: first boot...");
+        ESP_LOGI(MAIN_TAG, "No se ha configurado!\nInicializando estación: first boot...");
         nodo_init_dev(nodo_evt_group);
+        /* Leer nuevamente el tipo de dispositivo */
+        if ( ( dev_type = nvs_get_mode() ) == 0) {
+            ESP_LOGD(MAIN_TAG, "%s: Error leyendo DEV_TYPE en iniciación!", __func__);
+            return;
+        }
     }
-    // Sincronizar el tiempo con NTP
-    sync_time();
-    ESP_LOGI(MAIN_TAG, "app_main: Arrancando tareas...");
-    start(CONN_TYPE_WEBSOCKET, nodo_evt_group);
-#endif
-    ESP_LOGI(MAIN_TAG, "app_main: Listo!");
+    ESP_LOGI(MAIN_TAG, "%s: Arrancando tareas...", __func__);
+    if (dev_type == NODO_BLE)
+        start(CONN_TYPE_GATT, nodo_evt_group);
+    else
+        start(CONN_TYPE_WEBSOCKET, nodo_evt_group);
 }
 
 /*
