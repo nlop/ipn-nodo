@@ -39,8 +39,8 @@ void measure_task(void *pvParameters) {
     adc1_ch7_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_6, width, DEFAULT_VREF, adc1_ch7_chars);
     // Esperar a que se alce el evento HTTP_OK
-    ESP_LOGI(MEAS_TAG, "Esperando a HTTP_OK...");
-    xEventGroupWaitBits(arg->nodo_evt_group, HTTP_OK | GATT_TASK_OK, pdFALSE, pdFALSE, portMAX_DELAY);
+    ESP_LOGI(MEAS_TAG, "Esperando a HTTP_OK, GATT_TASK_OK (COMM_DISPATCHER_OK) ...");
+    xEventGroupWaitBits(arg->nodo_evt_group, COMM_DISPATCHER_OK, pdFALSE, pdFALSE, portMAX_DELAY);
     ESP_LOGI(MEAS_TAG, "Empezando a medir!");
     ws_queue_msg_t ws_msg = {0};
     measure_vector_t mvector = {0};

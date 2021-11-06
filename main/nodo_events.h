@@ -5,4 +5,6 @@
 #define GATT_OK         (1UL << 2UL)   // => Indica que la estación ya estableció el servicio BLE-GATT para compartir datos
 #define GATT_TASK_OK    (1UL << 2UL)   // => Indica que la estación ya lanzó el servicio para registrar los datos en el perfil GATT
 #define TOKEN_OK        (1UL << 3UL)   // => Indica que se ha obtenido un token para comunicarse con los servicios web
+#define COMM_CHANNEL_OK         (1UL << 0UL)    /* Indica que el canal de comunicación (WiFi, BLE) ya ha sido establecido */
+#define COMM_DISPATCHER_OK      (1UL << 1UL)    /* Indica que el despachador de mensajes (Cliente WebSocket o task GATT) ya estan listos */
 #endif

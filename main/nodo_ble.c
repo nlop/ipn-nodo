@@ -119,9 +119,9 @@ void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts
             break;
         case ESP_GATTS_START_EVT:
             ESP_LOGI(GATT_TAG, "SERVICE_START_EVT, status %d, service_handle %d", param->start.status, param->start.service_handle);
-            // Lanzar el evento GATT_OK para señalar que se ha alzaldo el servicio
-            ESP_LOGD(GATT_TAG, "%s: Alzando GATT_OK", __func__);
-            xEventGroupSetBits(nodo_evt_group_handle, GATT_OK);
+            // Lanzar el evento GATT_OK (COMM_CHANNEL_OK) para señalar que se ha alzaldo el servicio
+            ESP_LOGD(GATT_TAG, "%s: Alzando GATT_OK (COMM_CHANNEL_OK)", __func__);
+            xEventGroupSetBits(nodo_evt_group_handle, COMM_CHANNEL_OK);
             break;
         case ESP_GATTS_CONNECT_EVT:
             ESP_LOGI(GATT_TAG, "ESP_GATTS_CONNECT_EVT, conn_id = %d", param->connect.conn_id);
@@ -235,8 +235,8 @@ void init_gatt_service(const EventGroupHandle_t evt_group)
 
 void gatt_task(void *pvParameters) {
     gatt_task_arg_t *arg = (gatt_task_arg_t *) pvParameters;
-    xEventGroupWaitBits(arg->nodo_evt_group, GATT_OK, pdFALSE, pdTRUE, portMAX_DELAY);
-    xEventGroupSetBits(arg->nodo_evt_group, GATT_TASK_OK);
+    xEventGroupWaitBits(arg->nodo_evt_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupSetBits(arg->nodo_evt_group, COMM_DISPATCHER_OK);
     ws_queue_msg_t msg = {0};  
     for(;;) {
         ESP_LOGD(GATT_TASK_TAG, "Esperando mensaje...");

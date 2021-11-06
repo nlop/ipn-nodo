@@ -50,7 +50,7 @@ int nvs_save_wifi_credentials(char *ssid, char *psk) {
 int nvs_get_wifi_credentials(uint8_t **ssid, uint8_t **psk) {
     nvs_handle_t nvs_handle;
     size_t str_len;
-    esp_err_t ret = nvs_open(AP_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    esp_err_t ret = nvs_open(AP_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(NVS_TAG, "%s: Error abriendo %s [code %s]", __func__, AP_NAMESPACE, esp_err_to_name(ret));
         return -1;
@@ -58,7 +58,7 @@ int nvs_get_wifi_credentials(uint8_t **ssid, uint8_t **psk) {
     // SSID
     ret = nvs_get_str(nvs_handle, AP_SSID, NULL, &str_len);
     if (ret != ESP_OK) { return -1; }
-    *ssid = calloc(str_len, sizeof(uint8_t));
+    *ssid = (uint8_t *) calloc(str_len, sizeof(uint8_t));
     ret = nvs_get_str(nvs_handle, AP_SSID, (char *) *ssid, &str_len);
     if (ret != ESP_OK) { 
         ESP_LOGE(NVS_TAG, "%s: Error abriendo %s [code %s]", __func__, AP_SSID, esp_err_to_name(ret));
@@ -68,7 +68,7 @@ int nvs_get_wifi_credentials(uint8_t **ssid, uint8_t **psk) {
     // PSK
     ret = nvs_get_str(nvs_handle, AP_PSK, NULL, &str_len);
     if (ret != ESP_OK) { return -1; }
-    ssid = calloc(str_len, sizeof(uint8_t));
+    *psk = (uint8_t *) calloc(str_len, sizeof(uint8_t));
     ret = nvs_get_str(nvs_handle, AP_PSK, (char *) *psk, &str_len);
     if (ret != ESP_OK) { 
         ESP_LOGE(NVS_TAG, "%s: Error abriendo %s [code %s]", __func__, AP_PSK, esp_err_to_name(ret));
@@ -120,7 +120,7 @@ uint8_t *nvs_get_token() {
     nvs_handle_t nvs_handle;
     uint8_t *token;
     size_t str_len;
-    esp_err_t ret = nvs_open(TOKEN_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    esp_err_t ret = nvs_open(TOKEN_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(NVS_TAG, "%s: Error abriendo partición %s [code %s]", __func__, TOKEN_NAMESPACE, esp_err_to_name(ret));
         return NULL;
@@ -142,12 +142,12 @@ uint8_t *nvs_get_token() {
     return token;
 }
 
-int nvs_set_mode(uint8_t mode) {
+int nvs_set_mode(enum dev_type_t mode) {
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open(NVS_DEV_TYPE_NS, NVS_READWRITE, &nvs_handle);
+    esp_err_t ret = nvs_open(DEV_CHAR_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(NVS_TAG, ":%s: Error abriendo namespace: %s [code %s]", 
-                __func__, DEV_TYPE_NAMESPACE, esp_err_to_name(ret));
+        ESP_LOGE(NVS_TAG, "%s: Error abriendo namespace: %s [code %s]", 
+                __func__, DEV_CHAR_NAMESPACE, esp_err_to_name(ret));
         return -1;
     }
     ret = nvs_set_u8(nvs_handle, DEV_TYPE, mode);
@@ -168,10 +168,10 @@ int nvs_set_mode(uint8_t mode) {
 uint8_t nvs_get_mode(void) {
     nvs_handle_t nvs_handle;
     uint8_t dev_type;
-    esp_err_t ret = nvs_open(DEV_TYPE_NAMESPACE, NVS_READONLY, &nvs_handle);
+    esp_err_t ret = nvs_open(DEV_CHAR_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(NVS_TAG, "%s: Error abriendo namespace %s [code %s]" 
-                ,__func__, DEV_TYPE_NAMESPACE , esp_err_to_name(ret));
+                ,__func__, DEV_CHAR_NAMESPACE , esp_err_to_name(ret));
         return 0;
     }
     ret = nvs_get_u8(nvs_handle, DEV_TYPE, &dev_type);

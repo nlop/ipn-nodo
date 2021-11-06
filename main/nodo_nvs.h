@@ -8,13 +8,13 @@
 #include "nodo_def.h"
 
 #define NVS_TAG             "NODO-NVS"
-#define AP_NAMESPACE        "AP_NAMESPACE"          // Particion en la NVS para guardar info. sobre el punto de acceso WiFi
-#define AP_SSID             "AP_SSID"               // Entrada en la memoria NVS para el SSID
-#define AP_PSK              "AP_PSK"                // Entrada en la memoria NVS para la PSK
-#define TOKEN_NAMESPACE     "TOKEN_NAMESPACE"       // Particion en la NVS para guardar info. sobre el Token para acceder a los WS
-#define TOKEN               "TOKEN"                 // Entrada en la memoria NVS para el token
-#define DEV_TYPE_NAMESPACE  "DEV_TYPE_NAMESPACE"    // Namespace para guardar el tipo de dispositivo
-#define DEV_TYPE            "DEV_TYPE"              // Tipo de dispositivo
+#define AP_NAMESPACE        "AP_NS"             // Particion en la NVS para guardar info. sobre el punto de acceso WiFi
+#define AP_SSID             "AP_SSID"           // Entrada en la memoria NVS para el SSID
+#define AP_PSK              "AP_PSK"            // Entrada en la memoria NVS para la PSK
+#define TOKEN_NAMESPACE     "TOKEN_NS"          // Particion en la NVS para guardar info. sobre el Token para acceder a los WS
+#define TOKEN               "TOKEN"             // Entrada en la memoria NVS para el token
+#define DEV_CHAR_NAMESPACE  "DEV_NS"            // Namespace para guardar el tipo de dispositivo
+#define DEV_TYPE            "DEV_TYPE"          // Tipo de dispositivo
 
 /** Funciones **/
 int nvs_save_wifi_credentials(char *ssid, char *psk);

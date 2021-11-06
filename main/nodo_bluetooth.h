@@ -12,6 +12,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "nodo_queue.h"
+#include "nodo_ble.h"
 
 #define BT_TAG          "NODO BLUETOOTH"
 #define BT_DEVICE_NAME  "IPN-NODO"
@@ -43,6 +44,7 @@ void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param);
 uint8_t *copy_msg(uint8_t len, uint8_t *src);
 void nodo_init_send_task(void *pvParameters);
 byte_buffer_t nodo_ap_data_prepare(wifi_ap_record_t *ap_record);
-void nodo_spp_disable();
+void nodo_bt_disable(void);
+void nodo_spp_disable(void);
 
 #endif

@@ -232,6 +232,10 @@ void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param) {
                 ESP_LOGI(BT_TAG, "MSG_INIT");
                 msg.type = MSG_INIT;
                 break;
+            case MSG_INIT_BLE:
+                ESP_LOGI(BT_TAG, "MSG_INIT_BLE");
+                msg.type = MSG_INIT_BLE; 
+                break;
             case MSG_TOKEN:
                 ESP_LOGI(BT_TAG, "MSG_TOKEN");
                 msg.type = MSG_TOKEN; 
@@ -319,17 +323,17 @@ void nodo_init_send_task(void *pvParameters) {
 #endif
             switch( msg_buffer.type ) {
                 case MSG_SCAN_OK:
-                    ESP_LOGI(BT_TAG, "MSG_SCAN_OK APs found: %d", msg_buffer.msg_scan_ok.ap_scanned);
+                    ESP_LOGI(BT_TAG, "%s: MSG_SCAN_OK APs found: %d", __func__, msg_buffer.msg_scan_ok.ap_scanned);
                     uint8_t scanok_bytes[2] = {MSG_SCAN_OK, msg_buffer.msg_scan_ok.ap_scanned}; 
                     esp_spp_write(bt_conn_handle, 2 * sizeof(uint8_t), (uint8_t*) &scanok_bytes);
                     break;
                 case MSG_SCAN_DONE:
-                    ESP_LOGI(BT_TAG, "MSG_SCAN_DONE");
+                    ESP_LOGI(BT_TAG, "%s: MSG_SCAN_DONE", __func__);
                     uint8_t scan_done_bytes = MSG_SCAN_DONE;
                     esp_spp_write(bt_conn_handle, sizeof(uint8_t), (uint8_t*) &scan_done_bytes);
                     break;
                 case MSG_SCAN_SEND:
-                    ESP_LOGI(BT_TAG, "MSG_SCAN_SEND");
+                    ESP_LOGI(BT_TAG, "%s: MSG_SCAN_SEND", __func__);
                     /*
                      * Enviar cada una de las entradas de APs
                      */
@@ -351,27 +355,27 @@ void nodo_init_send_task(void *pvParameters) {
                     free(msg_buffer.ap_results->results);
                     break;
                 case MSG_WIFI_CONN_OK:
-                    ESP_LOGI(BT_TAG, "MSG_WIFI_CONN_OK");
+                    ESP_LOGI(BT_TAG, "%s: MSG_WIFI_CONN_OK", __func__);
                     esp_spp_write(bt_conn_handle, sizeof(uint8_t), (uint8_t*) &msg_buffer.type);
                     break;
                 case MSG_WIFI_CONN_FAIL:
-                    ESP_LOGI(BT_TAG, "MSG_WIFI_CONN_FAIL");
-                    //uint8_t conn_fail = MSG_WIFI_CONN_FAIL;
+                    ESP_LOGI(BT_TAG, "%s: MSG_WIFI_CONN_FAIL", __func__);
                     esp_spp_write(bt_conn_handle, sizeof(uint8_t), (uint8_t*) &msg_buffer.type);
                     break;
                 case MSG_TOKEN_ACK:
-                    ESP_LOGI(BT_TAG, "MSG_TOKEN_ACK");
-                    //uint8_t token_ack = MSG_TOKEN_ACK;
+                    ESP_LOGI(BT_TAG, "%s: MSG_TOKEN_ACK", __func__);
                     esp_spp_write(bt_conn_handle, sizeof(uint8_t), (uint8_t*) &msg_buffer.type);
                     break;
                 case MSG_SERV_CONN_OK:
-                    ESP_LOGI(BT_TAG, "MSG_SERV_CONN_OK");
-                    //uint8_t serv_conn_ok = MSG_SERV_CONN_OK;
+                    ESP_LOGI(BT_TAG, "%s: MSG_SERV_CONN_OK", __func__);
                     esp_spp_write(bt_conn_handle, sizeof(uint8_t), (uint8_t*) &msg_buffer.type);
                     break;
                 case MSG_SERV_CONN_FAIL:
-                    ESP_LOGI(BT_TAG, "MSG_SERV_CONN_OK");
-                    //uint8_t serv_conn_fail = MSG_SERV_CONN_OK;
+                    ESP_LOGI(BT_TAG, "%s: MSG_SERV_CONN_FAIL", __func__);
+                    esp_spp_write(bt_conn_handle, sizeof(uint8_t), (uint8_t*) &msg_buffer.type);
+                    break;
+                case MSG_GATT_OK:
+                    ESP_LOGI(BT_TAG, "%s: MSG_GATT_OK", __func__);
                     esp_spp_write(bt_conn_handle, sizeof(uint8_t), (uint8_t*) &msg_buffer.type);
                     break;
                default:
@@ -420,9 +424,23 @@ byte_buffer_t nodo_ap_data_prepare(wifi_ap_record_t *ap_record) {
 }
 
 /*
+ * Desactivar el canal de comunicación SPP
+ */
+void nodo_spp_disable(void) {
+    esp_err_t ret = esp_spp_stop_srv();
+    if( ret != ESP_OK ) {
+        ESP_LOGE(BT_TAG, "%s: Error cerrando servidor SPP [code %s]", __func__, esp_err_to_name(ret));
+    }
+    ret = esp_spp_deinit();
+    if( ret != ESP_OK ) {
+        ESP_LOGE(BT_TAG, "%s: Error desactivando SPP [code %s]", __func__, esp_err_to_name(ret));
+    }
+}
+
+/*
  * Desactivar el stack Bluetooth SPP
  */
-void nodo_spp_disable() {
+void nodo_bt_disable(void) {
     // Desactivar el stack Bluedroid
     esp_bluedroid_disable();
     // Desinicializar el stack Bluedroid
@@ -436,5 +454,5 @@ void nodo_spp_disable() {
      * TODO: Revisar si la invocación de esta función causa problemas
      *en el proceso de inicialización
      */
-    // esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
+    esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
 }

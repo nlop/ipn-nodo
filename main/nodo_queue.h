@@ -24,6 +24,8 @@ enum spp_msg_type_t {
     MSG_TOKEN_ACK,          // 0x18
     MSG_SERV_CONN_OK,       // 0x19
     MSG_SERV_CONN_FAIL,     // 0x1A
+    MSG_INIT_BLE,           // 0x1B
+    MSG_GATT_OK,            // 0x1C
     MSG_UNKNOWN             // 0x21
 };
 
@@ -71,7 +73,6 @@ typedef struct measure_t {
     int32_t value;
 } measure_t;
 
-// TODO: Agregar timestamp?
 typedef struct measure_vector_t {
     uint8_t len;
     struct measure_t *data;

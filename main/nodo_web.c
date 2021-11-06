@@ -1,5 +1,7 @@
 #include "nodo_web.h"
 
+#define MAX_SEND_ATTEMPTS       6    // Numero máximo de intentos para intercambiar el token temporal
+
 esp_err_t nodo_http_init_handler(esp_http_client_event_t *evt);
 uint8_t *response_body = NULL;
 uint8_t response_len = 0;
@@ -30,6 +32,7 @@ esp_http_client_config_t config = {
  * conexión de verdad, enviado por HTTPS
  */
 token_ret_t http_send_token(uint8_t *token, const char *mac) {
+    esp_err_t err;
     token_ret_t ret = {0};
     ESP_LOGD(WEB_TAG, "%s: Enviando Token : %s, MAC: %s", __func__, token, mac);
     // Crear cadena JSON
@@ -48,7 +51,11 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
     // Realizar petición
-    esp_err_t err = esp_http_client_perform(client);
+    uint8_t i = 0;
+    /* Reintentar y esperar hasta MAX_SEND_ATTEMPTS intentos */
+    while( (err = esp_http_client_perform(client)) != ESP_OK && i < MAX_SEND_ATTEMPTS) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
     if (err == ESP_OK) {
         ret.http_status = esp_http_client_get_status_code(client);
         uint8_t res_len = esp_http_client_get_content_length(client);
@@ -70,8 +77,8 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
         ESP_LOGE(WEB_TAG, "%s: HTTP POST request failed: %s", __func__, esp_err_to_name(err));
         ret.esp_status = ESP_FAIL;
     }
-    free(post_data);
     esp_http_client_cleanup(client);
+    free(post_data);
     return ret;
 }
 
@@ -120,7 +127,7 @@ void websocket_task(void *pvParameters) {
     arg = (ws_task_arg_t *) pvParameters;
     // Esperar a que haya conexión WiFI
     ESP_LOGI(WSTASK_TAG, "Esperando conexión WiFi...");
-    xEventGroupWaitBits(arg->nodo_evt_group, WIFI_OK, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(arg->nodo_evt_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
     ESP_LOGI(WSTASK_TAG, "Preparando WebSocket...");
     // Configurar cliente WebSocket
     esp_websocket_client_config_t websocket_cfg = { 
@@ -173,11 +180,11 @@ static void ws_evt_handler_conn(void *handler_args, esp_event_base_t base, int32
     switch (event_id) {
         case WEBSOCKET_EVENT_CONNECTED:
             ESP_LOGI(WSTASK_TAG, "WEBSOCKET_EVENT_CONNECTED");
-            xEventGroupSetBits(*evt_group, HTTP_OK);
+            xEventGroupSetBits(*evt_group, COMM_DISPATCHER_OK);
             break;
         case WEBSOCKET_EVENT_DISCONNECTED:
             ESP_LOGI(WSTASK_TAG, "WEBSOCKET_EVENT_DISCONNECTED");
-            xEventGroupClearBits(*evt_group, HTTP_OK);
+            xEventGroupClearBits(*evt_group, COMM_DISPATCHER_OK);
             // TODO: Reactivar conexión
             break;
     }

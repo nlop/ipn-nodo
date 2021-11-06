@@ -53,7 +53,8 @@ void app_main(void) {
          * Buscar en la NVS las llaves NVS_AP_PART.AP_SSID/AP_PSK para saber si la
          * estación ha sido inicializada anteriormente
          */
-        uint8_t *ssid, *psk;
+        uint8_t *ssid = NULL;
+        uint8_t *psk = NULL;
         if ( nvs_get_wifi_credentials(&ssid, &psk) == 0 ) {
             ESP_LOGI(MAIN_TAG, "Credenciales guardadas %s : %s", ssid, psk);
             ESP_LOGI(MAIN_TAG, "Inicializando estación: normal boot");
@@ -71,7 +72,8 @@ void app_main(void) {
         ESP_LOGI(MAIN_TAG, "Inicializando BLE GATT mode!");
         nodo_init_ble(nodo_evt_group); 
     } else {
-        ESP_LOGI(MAIN_TAG, "No se ha configurado!\nInicializando estación: first boot...");
+        ESP_LOGI(MAIN_TAG, "No se ha configurado!");
+        ESP_LOGI(MAIN_TAG, "Inicializando estación: first boot...");
         nodo_init_dev(nodo_evt_group);
         /* Leer nuevamente el tipo de dispositivo */
         if ( ( dev_type = nvs_get_mode() ) == 0) {
@@ -162,12 +164,11 @@ int start(enum conn_type_t conn_type, const EventGroupHandle_t evt_group) {
 void start_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
     if (connected == CONN_OK) {
         ESP_LOGI(MAIN_TAG, "start_notify_connected_cb: Conexión exitosa...");
-        // Activar bit WIFI_OK_EV
-        xEventGroupSetBits(evt_group, WIFI_OK);
-        // Guardar SSID/PSK en NVS
+        // Activar bit WIFI_OK (COMM_CHANNEL_OK)
+        xEventGroupSetBits(evt_group, COMM_CHANNEL_OK);
     } else {
         ESP_LOGI(MAIN_TAG, "start_notify_connected_cb: Falló conexión. Credenciales incorrectas!");
-        xEventGroupClearBits(evt_group, WIFI_OK);
+        xEventGroupClearBits(evt_group, COMM_CHANNEL_OK);
     }
 }
 

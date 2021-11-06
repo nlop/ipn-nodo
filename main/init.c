@@ -1,7 +1,6 @@
 #include "init.h"
 
-#define MAX_SEND_ATTEMPTS       6    // Numero máximo de intentos para intercambiar el token temporal
-#define APP_DISCONNECT_TIMEOUT  5000 // ms para que la aplicacion se desconecte
+#define SPP_DISCONNECT_TIMEOUT  5000 // ms para que la aplicacion se desconecte
 
 /** Variables globales **/
 uint8_t ssid[MAX_LEN_SSID];
@@ -29,29 +28,50 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     queue_in = ret.in_queue;
     queue_out = ret.out_queue;
     send_task_handle = ret.send_handle;
-    // Arrancar WiFi 
+    // Arrancar conexión WiFi 
     nodo_wifi_init(init_notify_connected_cb, event_group);
     // Arrancar el Task para leer mensajes de inicialización
+    init_recv_task_arg_t arg = { .queue_in = queue_in };
     xTaskCreate(
             nodo_init_recv_task, 
             "nodo_recv_init_task", 
             configMINIMAL_STACK_SIZE * 8,
-            (void *) &queue_in,  
+            (void *) &arg,  
             5,
             &recv_task_handle);
-    // Cerar los canales de comunicación de la inicialización (BT SPP)
-    // cuando los eventos WIFI_OK, TOKEN_OK hayan sido activados
-    xEventGroupWaitBits(event_group, WIFI_OK | TOKEN_OK,
-            pdFALSE,
-            pdTRUE,
-            portMAX_DELAY);
-    ESP_LOGI(INIT_TAG, "nodo_init_dev: Listo para cerrar SPP!");
+    /* Cerar los canales de comunicación de la inicialización (BT SPP)
+     * cuando los eventos WIFI_OK o GATT_OK (COMM_CHANNEL_OK) , hayan sido activados */
+    xEventGroupWaitBits(event_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
+    if (arg.init_dev_type == NODO_WIFI) {
+        /* En caso de una conexión web, también esperar el intercambio del token */
+        xEventGroupWaitBits(event_group, TOKEN_OK, pdFALSE, pdTRUE, portMAX_DELAY);
+    } else {
+        spp_msg_t msg = {0};
+        msg.type = MSG_GATT_OK;
+        xQueueSendToBack(queue_out, &msg, pdMS_TO_TICKS(6000));
+    }
+    ESP_LOGI(INIT_TAG, "%s: Inicio exitoso : %s", __func__, 
+            (arg.init_dev_type == NODO_WIFI ? "NODO_WIFI" : "NODO_BLE" ));
+    ESP_LOGI(INIT_TAG, "%s: Listo para cerrar SPP!", __func__);
     /* Guardar tipo de dispositivo (WiFi) */
-    nvs_set_mode(NODO_WIFI);
+    if ( nvs_set_mode(arg.init_dev_type) != 0) {
+        ESP_LOGD(INIT_TAG, "%s: Error guardando modo de dispositivo!", __func__);
+    }
     // Esperar para que la aplicación cierre la conexión de forma ordinaria
-    vTaskDelay(pdMS_TO_TICKS(APP_DISCONNECT_TIMEOUT));
-    // Cerrar canales BT SPP de inicialización
-    close_init_comms(send_task_handle, recv_task_handle);
+    vTaskDelay(pdMS_TO_TICKS(SPP_DISCONNECT_TIMEOUT));
+    /* Cerrar canales BT SPP */
+    nodo_spp_disable();
+    ESP_LOGI(INIT_TAG, "%s: SPP Cerrado!", __func__);
+    /* Eliminar los task que atienden el intercambio de datos */
+    vTaskDelete(send_task_handle);
+    vTaskDelete(recv_task_handle);
+    /* Eliminar las colas de intercambio de mensajes */
+    vQueueDelete(queue_in);
+    vQueueDelete(queue_out);
+    if (arg.init_dev_type == NODO_WIFI) {
+        nodo_bt_disable();
+        ESP_LOGI(INIT_TAG, "%s: Bluetooth desactivado!", __func__);
+    }
 }
 
 void nodo_init_ble(const EventGroupHandle_t evt_group) {
@@ -65,11 +85,11 @@ void nodo_init_ble(const EventGroupHandle_t evt_group) {
  */
 void nodo_init_recv_task(void *pvParameters) {
     ESP_LOGI(INIT_TAG, "Empezando nodo_recv_init_task...");
-    QueueHandle_t *in_queue = (QueueHandle_t*) pvParameters;
+    init_recv_task_arg_t *arg = (init_recv_task_arg_t*) pvParameters;
     spp_msg_t msg_buffer = {0};
     BaseType_t queueRet;
     for(;;) {
-        queueRet = xQueueReceive(*in_queue,  (void *) &msg_buffer, portMAX_DELAY);
+        queueRet = xQueueReceive(arg->queue_in,  (void *) &msg_buffer, portMAX_DELAY);
         if(queueRet == pdTRUE) {
             ESP_LOGI(INIT_TAG, "Recibiendo de la fila...");
             switch( msg_buffer.type ) {
@@ -93,10 +113,17 @@ void nodo_init_recv_task(void *pvParameters) {
                     break;
                 case MSG_INIT:
                     ESP_LOGI(INIT_TAG, "MSG_INIT");
-                    // Empezar a escanear puntos de acceso (APs) 
+                    arg->init_dev_type = NODO_WIFI;
+                    /* Empezar a escanear puntos de acceso (APs) */
                     nodo_ap_scan_results_t ap_results = nodo_wifi_scan();   
-                    // Enviar resultados a la cola de salida (send) 
+                    /* Enviar resultados a la cola de salida (send) */ 
                     send_ap_scanned(&ap_results);
+                    break;
+                case MSG_INIT_BLE:
+                    ESP_LOGI(INIT_TAG, "MSG_INIT_BLE");
+                    /* Iniciar el servidor GATT */
+                    arg->init_dev_type = NODO_BLE;
+                    init_gatt_service(nodo_event_group);
                     break;
                 case MSG_TOKEN:
                     ESP_LOGI(INIT_TAG, "MSG_TOKEN");
@@ -113,8 +140,6 @@ void nodo_init_recv_task(void *pvParameters) {
 }
 
 void send_init_token(uint8_t *token) {
-    //uint8_t mac_nodo[6];
-    //uint8_t mac_nodo_str[32];
     spp_msg_t msg = {0};
     // Confirmar que el token fue recibido
     msg.type = MSG_TOKEN_ACK;
@@ -122,28 +147,23 @@ void send_init_token(uint8_t *token) {
     memset(&msg, 0, sizeof(spp_msg_t));
     // Recibir el token y mandar una petición web 
     const char *mac_addr = nodo_get_mac();
-    uint8_t i = 0;
-    while (i < MAX_SEND_ATTEMPTS) {
-        token_ret_t ret = http_send_token(token, mac_addr);
-        if (ret.esp_status == ESP_OK && ret.http_status == 200) {
-            msg.type = MSG_SERV_CONN_OK;
-            ESP_LOGI(WEB_TAG, "Conexión con servidor exitosa!");
-            ESP_LOGI(WEB_TAG, "Token: %s", ret.token);
-            // Activar bit TOKEN_OK
-            xEventGroupSetBits(nodo_event_group, TOKEN_OK);
-            if (nvs_save_token((char *) ret.token) != 0) {
-                ESP_LOGE(INIT_TAG, "send_init_token: Error guardando token!");
-            }
-            ESP_LOGI(INIT_TAG, "Token almacenado exitosamente!");
-            free(ret.token);
-            break;
-        } else {
-            ESP_LOGI(WEB_TAG, "Conexión con servidor falló!");
-            msg.type = MSG_SERV_CONN_FAIL;
+    /* Esperar para que se obtenga una conexión WiFi */
+    xEventGroupWaitBits(nodo_event_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
+    token_ret_t ret = http_send_token(token, mac_addr);
+    if (ret.esp_status == ESP_OK && ret.http_status == 200) {
+        msg.type = MSG_SERV_CONN_OK;
+        ESP_EARLY_LOGI(WEB_TAG, "Conexión con servidor exitosa!");
+        ESP_EARLY_LOGI(WEB_TAG, "Token: %s", ret.token);
+        // Activar bit TOKEN_OK
+        xEventGroupSetBits(nodo_event_group, TOKEN_OK);
+        if (nvs_save_token((char *) ret.token) != 0) {
+            ESP_EARLY_LOGE(INIT_TAG, "send_init_token: Error guardando token!");
         }
-        /* Esperar un poquito */
-        vTaskDelay(pdMS_TO_TICKS(500));
-        ESP_LOGI(WEB_TAG, "Reintentando...");
+        ESP_EARLY_LOGI(INIT_TAG, "Token almacenado exitosamente!");
+        free(ret.token);
+    } else {
+        ESP_EARLY_LOGI(WEB_TAG, "Conexión con servidor falló!");
+        msg.type = MSG_SERV_CONN_FAIL;
     }
     xQueueSendToBack(queue_out, &msg, portMAX_DELAY);
 }
@@ -181,8 +201,8 @@ void init_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
     if (connected == CONN_OK) {
         ESP_LOGI(INIT_TAG, "Conexión exitosa...");
         msg_conn_ok.type = MSG_WIFI_CONN_OK;
-        // Activar bit WIFI_OK_EV
-        xEventGroupSetBits(evt_group, WIFI_OK);
+        // Activar bit WIFI_OK (COMM_CHANNEL_OK)
+        xEventGroupSetBits(evt_group, COMM_CHANNEL_OK);
         // Guardar SSID/PSK en NVS
         ESP_LOGI(INIT_TAG, "Guardando credenciales...");
         int ret = nvs_save_wifi_credentials((char *) ssid, (char *) psk);
@@ -194,7 +214,7 @@ void init_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
     } else {
         ESP_LOGI(INIT_TAG, "Falló conexión...");
         msg_conn_ok.type = MSG_WIFI_CONN_FAIL;
-        xEventGroupClearBits(evt_group, WIFI_OK);
+        xEventGroupClearBits(evt_group, COMM_CHANNEL_OK);
     }
      xQueueSendToBack(queue_out, &msg_conn_ok, portMAX_DELAY);
 }
@@ -207,13 +227,6 @@ void init_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
  *      recv_task: Handle obtenido al lanzar el task de recibo de datos (capa aplicación)
  */
 void close_init_comms(TaskHandle_t send_task, TaskHandle_t recv_task) {
-    // Eliminar los task que atienden el intercambio de datos
-    vTaskDelete(send_task);
-    vTaskDelete(recv_task);
-    // Eliminar las colas de intercambio de mensajes
-    vQueueDelete(queue_in);
-    vQueueDelete(queue_out);
-    nodo_spp_disable();
-    ESP_LOGI(INIT_TAG, "close_init_comms: BT SPP Cerrado!");
+    nodo_bt_disable();
 }
 

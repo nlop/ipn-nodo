@@ -22,12 +22,18 @@
 #define MAX_LEN_SSID    32          // Longitud máx. del SSID según el protocolo 802.11
 #define MAX_LEN_PSK     64          // Longitud máx. para la PSK según el protocolo 802.11
 
-/** Funciones **/
+/* Funciones */
 void nodo_init_ble(const EventGroupHandle_t evt_group);
 void nodo_init_dev(EventGroupHandle_t event_group);
 void nodo_init_recv_task(void *pvParameters);
 void send_ap_scanned(nodo_ap_scan_results_t *results);
 void init_notify_connected_cb(EventGroupHandle_t evt_group, bool connected);
 void send_init_token(uint8_t *token);
+
+/* Estructuras */
+typedef struct init_recv_task_arg_t {
+    QueueHandle_t queue_in;
+    enum dev_type_t init_dev_type;
+} init_recv_task_arg_t;
 
 #endif
