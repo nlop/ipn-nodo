@@ -10,6 +10,8 @@
 #define WS_QUEUE_LEN        CONFIG_WS_QUEUE_LEN
 #define GATT_QUEUE_LEN      5
 
+/* TODO: Refactor!!!! */
+
 /** Enums **/
 enum spp_msg_type_t { 
     MSG_INIT = 0xF, 
@@ -30,8 +32,11 @@ enum spp_msg_type_t {
 };
 
 enum ws_msg_type_t  {
-    MSG_MEAS_VECTOR
+    MSG_MEAS_VECTOR,
+    MSG_STATUS_GENERIC
 };
+
+
 
 /** Estructuras **/
 
@@ -65,6 +70,11 @@ typedef struct spp_msg_t {
     };
 } spp_msg_t;
 
+typedef struct ws_status_generic {
+    uint8_t status;
+    esp_err_t esp_status;
+} ws_status_generic;
+
 /** Enums **/
 enum measure_type_t { TEMPERATURE, HUMIDITY, PH, LIGHT };
 
@@ -83,6 +93,7 @@ typedef struct ws_queue_msg_t {
     enum ws_msg_type_t type;
     union {
         measure_vector_t *meas_vector; 
+        ws_status_generic status;    
     };
 } ws_queue_msg_t;
 

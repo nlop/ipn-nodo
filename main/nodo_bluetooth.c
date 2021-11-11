@@ -24,7 +24,7 @@ TaskHandle_t send_task_handle;
 uint32_t bt_conn_handle;
 
 
-void nodo_bt_init() {
+int nodo_bt_init(esp_bt_mode_t mode) {
     esp_err_t ret;
     /* 
      * Obtener la memoria para el controlador de bluettoth utilizando el modo BLE
@@ -34,30 +34,32 @@ void nodo_bt_init() {
 
     // Obtener la configuración predefinida para el controlador BT
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    bt_cfg.mode = mode;
 
     // Inicialziar el controlador con la configuración obtenida
     if ((ret = esp_bt_controller_init(&bt_cfg)) != ESP_OK) {
-        ESP_LOGE(BT_TAG, "%s Falla al inicializar el controlador BT: %s\n", __func__, esp_err_to_name(ret));
-        return;
+        ESP_LOGE(BT_TAG, "%s: Falla al inicializar el controlador BT: %s\n", __func__, esp_err_to_name(ret));
+        return -1;
     }
 
     // Habilitar el controlador de bluetooth utilizando BT Classic
-    if ((ret = esp_bt_controller_enable(ESP_BT_MODE_BTDM)) != ESP_OK) {
-        ESP_LOGE(BT_TAG, "%s Falla habilitando el controlador BT: %s\n", __func__, esp_err_to_name(ret));
-        return;
+    if ((ret = esp_bt_controller_enable(mode)) != ESP_OK) {
+        ESP_LOGE(BT_TAG, "%s: Falla habilitando el controlador BT: %s\n", __func__, esp_err_to_name(ret));
+        return -1;
     }
 
     // Inicializar el stack de bluedroid (operador de la infraestructura BT)
     if ((ret = esp_bluedroid_init()) != ESP_OK) {
-        ESP_LOGE(BT_TAG, "%s initialize bluedroid failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
+        ESP_LOGE(BT_TAG, "%s: initialize bluedroid failed: %s\n", __func__, esp_err_to_name(ret));
+        return -1;
     }
 
     // Habilitar el stack
     if ((ret = esp_bluedroid_enable()) != ESP_OK) {
         ESP_LOGE(BT_TAG, "%s enable bluedroid failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
+        return -1;
     }
+    return 0;
 }
 
 /**

@@ -1,4 +1,4 @@
-#include "nodo_ble.h"
+#include "nodo_gatts.h"
 
 /* Campo de control para rastrear la configuración del Advertisement y
  * Response. Dado que al registrar las dos configuraciones, se lanza un evento
@@ -46,21 +46,21 @@ void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
         case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
             /* advertising start complete event to indicate advertising start successfully or failed */
             if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
-                ESP_LOGE(GATT_TAG, "advertising start failed");
+                ESP_LOGE(GATTS_TAG, "advertising start failed");
             }else{
-                ESP_LOGI(GATT_TAG, "advertising start successfully");
+                ESP_LOGI(GATTS_TAG, "advertising start successfully");
             }
             break;
         case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
             if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS) {
-                ESP_LOGE(GATT_TAG, "Advertising stop failed");
+                ESP_LOGE(GATTS_TAG, "Advertising stop failed");
             }
             else {
-                ESP_LOGI(GATT_TAG, "Stop adv successfully\n");
+                ESP_LOGI(GATTS_TAG, "Stop adv successfully\n");
             }
             break;
         case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT:
-            ESP_LOGI(GATT_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
+            ESP_LOGI(GATTS_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
                   param->update_conn_params.status,
                   param->update_conn_params.min_int,
                   param->update_conn_params.max_int,
@@ -79,53 +79,53 @@ void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts
         case ESP_GATTS_REG_EVT:{
             esp_err_t set_dev_name_ret = esp_ble_gap_set_device_name(NODO_DEV_NAME);
             if (set_dev_name_ret){
-                ESP_LOGE(GATT_TAG, "set device name failed, error code = %x", set_dev_name_ret);
+                ESP_LOGE(GATTS_TAG, "set device name failed, error code = %x", set_dev_name_ret);
             }
             //config adv data
             esp_err_t ret = esp_ble_gap_config_adv_data(&adv_data);
             if (ret){
-                ESP_LOGE(GATT_TAG, "config adv data failed, error code = %x", ret);
+                ESP_LOGE(GATTS_TAG, "config adv data failed, error code = %x", ret);
             }
             adv_config_done |= ADV_CONFIG_FLAG;
             //config scan response data
             ret = esp_ble_gap_config_adv_data(&scan_rsp_data);
             if (ret){
-                ESP_LOGE(GATT_TAG, "config scan response data failed, error code = %x", ret);
+                ESP_LOGE(GATTS_TAG, "config scan response data failed, error code = %x", ret);
             }
             adv_config_done |= SCAN_RSP_CONFIG_FLAG;
             esp_err_t create_attr_ret = esp_ble_gatts_create_attr_tab(gatt_db, gatts_if, DB_LEN, SVC_INST_ID);
             if (create_attr_ret){
-                ESP_LOGE(GATT_TAG, "create attr table failed, error code = %x", create_attr_ret);
+                ESP_LOGE(GATTS_TAG, "create attr table failed, error code = %x", create_attr_ret);
             }
         }
        	    break;
         case ESP_GATTS_READ_EVT:
-            ESP_LOGI(GATT_TAG, "ESP_GATTS_READ_EVT");
+            ESP_LOGI(GATTS_TAG, "ESP_GATTS_READ_EVT");
        	    break;
         case ESP_GATTS_WRITE_EVT:
-            ESP_LOGI(GATT_TAG, "GATT_WRITE_EVT, handle = %d, value len = %d, value :", param->write.handle, param->write.len);
-            esp_log_buffer_hex(GATT_TAG, param->write.value, param->write.len);
+            ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, handle = %d, value len = %d, value :", param->write.handle, param->write.len);
+            esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
       	    break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             // the length of gattc prepare write data must be less than GATTS_DEMO_CHAR_VAL_LEN_MAX.
-            ESP_LOGI(GATT_TAG, "ESP_GATTS_EXEC_WRITE_EVT");
+            ESP_LOGI(GATTS_TAG, "ESP_GATTS_EXEC_WRITE_EVT");
             //example_exec_write_event_env(&prepare_write_env, param);
             break;
         case ESP_GATTS_MTU_EVT:
-            ESP_LOGI(GATT_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
+            ESP_LOGI(GATTS_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
             break;
         case ESP_GATTS_CONF_EVT:
-            ESP_LOGI(GATT_TAG, "ESP_GATTS_CONF_EVT, status = %d, attr_handle %d", param->conf.status, param->conf.handle);
+            ESP_LOGI(GATTS_TAG, "ESP_GATTS_CONF_EVT, status = %d, attr_handle %d", param->conf.status, param->conf.handle);
             break;
         case ESP_GATTS_START_EVT:
-            ESP_LOGI(GATT_TAG, "SERVICE_START_EVT, status %d, service_handle %d", param->start.status, param->start.service_handle);
+            ESP_LOGI(GATTS_TAG, "SERVICE_START_EVT, status %d, service_handle %d", param->start.status, param->start.service_handle);
             // Lanzar el evento GATT_OK (COMM_CHANNEL_OK) para señalar que se ha alzaldo el servicio
-            ESP_LOGD(GATT_TAG, "%s: Alzando GATT_OK (COMM_CHANNEL_OK)", __func__);
+            ESP_LOGD(GATTS_TAG, "%s: Alzando GATT_OK (COMM_CHANNEL_OK)", __func__);
             xEventGroupSetBits(nodo_evt_group_handle, COMM_CHANNEL_OK);
             break;
         case ESP_GATTS_CONNECT_EVT:
-            ESP_LOGI(GATT_TAG, "ESP_GATTS_CONNECT_EVT, conn_id = %d", param->connect.conn_id);
-            esp_log_buffer_hex(GATT_TAG, param->connect.remote_bda, 6);
+            ESP_LOGI(GATTS_TAG, "ESP_GATTS_CONNECT_EVT, conn_id = %d", param->connect.conn_id);
+            esp_log_buffer_hex(GATTS_TAG, param->connect.remote_bda, 6);
             esp_ble_conn_update_params_t conn_params = {0};
             memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
             /* For the iOS system, please refer to Apple official documents about the BLE connection parameters restrictions. */
@@ -137,25 +137,25 @@ void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts
             esp_ble_gap_update_conn_params(&conn_params);
             break;
         case ESP_GATTS_DISCONNECT_EVT:
-            ESP_LOGI(GATT_TAG, "ESP_GATTS_DISCONNECT_EVT, reason = 0x%x", param->disconnect.reason);
+            ESP_LOGI(GATTS_TAG, "ESP_GATTS_DISCONNECT_EVT, reason = 0x%x", param->disconnect.reason);
             esp_ble_gap_start_advertising(&adv_params);
             break;
         case ESP_GATTS_SET_ATTR_VAL_EVT:
-            ESP_LOGI(GATT_TAG, "ESP_GATTS_SET_ATTR_VAL_EVT service:%x attr:%x status: %x", 
+            ESP_LOGI(GATTS_TAG, "ESP_GATTS_SET_ATTR_VAL_EVT service:%x attr:%x status: %x", 
                     param->set_attr_val.srvc_handle,
                     param->set_attr_val.attr_handle,
                     param->set_attr_val.status);
             break;
         case ESP_GATTS_CREAT_ATTR_TAB_EVT:{
             if (param->add_attr_tab.status != ESP_GATT_OK){
-                ESP_LOGE(GATT_TAG, "create attribute table failed, error code=0x%x", param->add_attr_tab.status);
+                ESP_LOGE(GATTS_TAG, "create attribute table failed, error code=0x%x", param->add_attr_tab.status);
             }
             else if (param->add_attr_tab.num_handle != DB_LEN){
-                ESP_LOGE(GATT_TAG, "create attribute table abnormally, num_handle (%d) \
+                ESP_LOGE(GATTS_TAG, "create attribute table abnormally, num_handle (%d) \
                         doesn't equal to HRS_IDX_NB(%d)", param->add_attr_tab.num_handle, DB_LEN);
             }
             else {
-                ESP_LOGI(GATT_TAG, "create attribute table successfully, the number handle = %d",param->add_attr_tab.num_handle);
+                ESP_LOGI(GATTS_TAG, "create attribute table successfully, the number handle = %d",param->add_attr_tab.num_handle);
                 memcpy(nodo_service_handles, param->add_attr_tab.handles, sizeof(nodo_service_handles));
                 esp_ble_gatts_start_service(nodo_service_handles[ID_SVC]);
             }
@@ -182,7 +182,7 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
         if (param->reg.status == ESP_GATT_OK) {
             nodo_service_profile_tab[NODO_SERVICE_ID].gatts_if = gatts_if;
         } else {
-            ESP_LOGE(GATT_TAG, "reg app failed, app_id %04x, status %d",
+            ESP_LOGE(GATTS_TAG, "reg app failed, app_id %04x, status %d",
                     param->reg.app_id,
                     param->reg.status);
             return;
@@ -201,34 +201,35 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
     } while (0);
 }
 /*
- * Función para iniciar el perfil GATT de BLE
+ * Función para iniciar el servidor GATT de BLE
  */
-void init_gatt_service(const EventGroupHandle_t evt_group)
+void init_gatt_server(const EventGroupHandle_t evt_group)
 {
     esp_err_t ret;
     // Copiar el handle al groupo de eventos
     nodo_evt_group_handle = evt_group;
     ret = esp_ble_gatts_register_callback(gatts_event_handler);
     if (ret){
-        ESP_LOGE(GATT_TAG, "gatts register error, error code = %x", ret);
+        ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
         return;
     }
 
     ret = esp_ble_gap_register_callback(gap_event_handler);
     if (ret){
-        ESP_LOGE(GATT_TAG, "gap register error, error code = %x", ret);
+        ESP_LOGE(GATTS_TAG, "gap register error, error code = %x", ret);
         return;
     }
 
     ret = esp_ble_gatts_app_register(GATTS_APP_ID);
+    // TODO: Reemplazar por NODO_SERVICE_ID? ~~^^
     if (ret){
-        ESP_LOGE(GATT_TAG, "gatts app register error, error code = %x", ret);
+        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
         return;
     }
 
     esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(MTU_SIZE);
     if (local_mtu_ret){
-        ESP_LOGE(GATT_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
+        ESP_LOGE(GATTS_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
     }
 
 }

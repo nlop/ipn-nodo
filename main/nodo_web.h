@@ -10,11 +10,14 @@
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_websocket_client.h"
+#include "esp_event.h"
 #include "cJSON.h"
 #include "nodo_events.h"
 #include "nodo_queue.h"
 #include "nodo_json.h"
 #include "nodo_mac.h"
+#include "nodo_bluetooth.h"
+#include "nodo_gattc.h"
 
 #define WEB_TAG             "NODO WEB"
 #define WSTASK_TAG          "WS TASK"
@@ -45,14 +48,16 @@ typedef struct token_ret_t {
 } token_ret_t;
 
 typedef struct ws_task_arg_t {
-    QueueHandle_t out_queue;              // Cola para recibir paquetes enviados por otros tasks
-    EventGroupHandle_t nodo_evt_group;    // Handle al event group de todo el nodo. Usado para
-                                            // alzar el evento HTTP_OK y esperar WIFI_OK
-    uint8_t *token;                         // Token para comunicarse de forma segura con los servicios web
+    QueueHandle_t out_queue;                /* Cola para recibir paquetes enviados por otros tasks */
+    EventGroupHandle_t nodo_evt_group;      /* Handle al event group de todo el nodo. Usado para
+                                             * alzar el evento HTTP_OK (COMM_CHANNEL_OK) y esperar WIFI_OK (COMM DISPATCHER_OK) */
+    uint8_t *token;                         /* Token para comunicarse de forma segura con los servicios web */
 } ws_task_arg_t;
 
 /** Funciones **/
 token_ret_t http_send_token(uint8_t *token, const char *mac);
 void websocket_task(void *pvParameters);
+void gattc_ws_callback(nodo_gattc_events_t evt, void *arg);
+
     
 #endif

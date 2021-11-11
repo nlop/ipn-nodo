@@ -19,7 +19,10 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     TaskHandle_t recv_task_handle, send_task_handle;
     nodo_event_group = event_group;
     /*** Bluetooth ***/
-    nodo_bt_init();
+    if ( nodo_bt_init(ESP_BT_MODE_BTDM) != 0 ) {
+        ESP_LOGE(INIT_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
+        return;
+    }
     spp_init_ret_t ret = nodo_bt_spp_init(nodo_spp_init_recv_cb);
     if ( ret.status != 0 ) {
         ESP_LOGE(INIT_TAG, "nodo_init_dev: Error arrancando BT SPP!");
@@ -71,12 +74,20 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     if (arg.init_dev_type == NODO_WIFI) {
         nodo_bt_disable();
         ESP_LOGI(INIT_TAG, "%s: Bluetooth desactivado!", __func__);
+    } else {
+        /* Deshabilitar WiFi (iniciado de forma automática al arrancar) */
+        if ( nodo_wifi_disable() != 0 ) {
+            ESP_LOGE(INIT_TAG, "%s: Error deshabilitando WiFi!", __func__);
+        }
     }
 }
 
-void nodo_init_ble(const EventGroupHandle_t evt_group) {
-    nodo_bt_init();
-    init_gatt_service(evt_group);
+void nodo_init_ble_gatts(const EventGroupHandle_t evt_group) {
+    if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
+        ESP_LOGE(INIT_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
+        return;
+    }
+    init_gatt_server(evt_group);
 }
 
 /*
@@ -123,7 +134,7 @@ void nodo_init_recv_task(void *pvParameters) {
                     ESP_LOGI(INIT_TAG, "MSG_INIT_BLE");
                     /* Iniciar el servidor GATT */
                     arg->init_dev_type = NODO_BLE;
-                    init_gatt_service(nodo_event_group);
+                    init_gatt_server(nodo_event_group);
                     break;
                 case MSG_TOKEN:
                     ESP_LOGI(INIT_TAG, "MSG_TOKEN");
@@ -152,17 +163,17 @@ void send_init_token(uint8_t *token) {
     token_ret_t ret = http_send_token(token, mac_addr);
     if (ret.esp_status == ESP_OK && ret.http_status == 200) {
         msg.type = MSG_SERV_CONN_OK;
-        ESP_EARLY_LOGI(WEB_TAG, "Conexión con servidor exitosa!");
-        ESP_EARLY_LOGI(WEB_TAG, "Token: %s", ret.token);
+        ESP_LOGI(WEB_TAG, "Conexión con servidor exitosa!");
+        ESP_LOGI(WEB_TAG, "Token: %s", ret.token);
         // Activar bit TOKEN_OK
         xEventGroupSetBits(nodo_event_group, TOKEN_OK);
         if (nvs_save_token((char *) ret.token) != 0) {
-            ESP_EARLY_LOGE(INIT_TAG, "send_init_token: Error guardando token!");
+            ESP_LOGE(INIT_TAG, "send_init_token: Error guardando token!");
         }
-        ESP_EARLY_LOGI(INIT_TAG, "Token almacenado exitosamente!");
+        ESP_LOGI(INIT_TAG, "Token almacenado exitosamente!");
         free(ret.token);
     } else {
-        ESP_EARLY_LOGI(WEB_TAG, "Conexión con servidor falló!");
+        ESP_LOGI(WEB_TAG, "Conexión con servidor falló!");
         msg.type = MSG_SERV_CONN_FAIL;
     }
     xQueueSendToBack(queue_out, &msg, portMAX_DELAY);

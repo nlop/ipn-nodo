@@ -11,6 +11,10 @@ static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32
 cJSON *get_measure_vector_json(measure_vector_t *mvector, const char *dev_addr);
 int json_wrap_message_buff(enum json_msg_status_t , enum json_msg_type_t ,  cJSON *, char *, size_t);
 char *get_timestamp();
+void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue);
+cJSON *get_generic_msg_json(esp_err_t esp_status, uint8_t status);
+
+extern uint8_t gatt_client_enabled;
 
 
 /*
@@ -35,7 +39,7 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     esp_err_t err;
     token_ret_t ret = {0};
     ESP_LOGD(WEB_TAG, "%s: Enviando Token : %s, MAC: %s", __func__, token, mac);
-    // Crear cadena JSON
+    /* Crear cadena JSON */
     // TODO: Cambiar al nuevo formato gral
     cJSON *json_obj = cJSON_CreateObject();
     cJSON *token_val = cJSON_CreateString((char *) token);
@@ -45,12 +49,12 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     char *post_data = cJSON_PrintUnformatted(json_obj);
     cJSON_Delete(json_obj);
     ESP_LOGD(WEB_TAG, "%s: Body : %s",__func__, post_data);
-    // Preparar cliente HTTP
+    /* Preparar cliente HTTP */
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
-    // Realizar petición
+    /* Realizar petición */
     uint8_t i = 0;
     /* Reintentar y esperar hasta MAX_SEND_ATTEMPTS intentos */
     while( (err = esp_http_client_perform(client)) != ESP_OK && i < MAX_SEND_ATTEMPTS) {
@@ -134,6 +138,8 @@ void websocket_task(void *pvParameters) {
         .user_agent = NODO_USER_AGENT,
         .host = WEBSOCKET_HOST,
         .transport = WEBSOCKET_TRANSPORT_OVER_TCP,
+        .ping_interval_sec = 120,
+        // TODO: menuconfig ~^^
 #ifdef WEBSOCKET_PORT
         .port = WEBSOCKET_PORT
 #endif
@@ -143,8 +149,8 @@ void websocket_task(void *pvParameters) {
     esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_CONNECTED, ws_evt_handler_conn, (void *) &(arg->nodo_evt_group));
     esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DISCONNECTED, ws_evt_handler_conn, (void *) &(arg->nodo_evt_group));
     // Registrar handler para WEBSOCKET_EVENT_DATA/ERROR
-    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DATA, ws_evt_handler_data, NULL);
-    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ERROR, ws_evt_handler_data, NULL);
+    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DATA, ws_evt_handler_data, &(arg->out_queue));
+    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ERROR, ws_evt_handler_data, NULL); // NULL : user ctx
     esp_websocket_client_start(ws_client);
     while (esp_websocket_client_is_connected(ws_client) != true) {
         ESP_LOGW(WSTASK_TAG, "Esperando conexion con WebSocket..."); 
@@ -160,14 +166,21 @@ void websocket_task(void *pvParameters) {
             // TODO: Manejar error donde buffer no puede almacenar JSON
             cJSON *mvector_json = get_measure_vector_json(msg.meas_vector, nodo_get_mac()); //(char *) &buffer, JSON_BUFFER_SIZE);
             json_wrap_message_buff(STATUS_OK, LIVE_DATA, mvector_json, buffer, JSON_BUFFER_SIZE );
-            //int len = sprintf(buffer, "\{\"timestamp\":\"1998-02-11\",\"measurements\":\[\{\"type\":\"temperature\",\"value\":%d},\{\"type\":\"humidity\",\"value\":%d}]}", msg.meas_vector->data[0].value, msg.meas_vector->data[1].value);
             ESP_LOGI(WSTASK_TAG, "Enviando mensaje al servidor...");
             ESP_LOGI(WSTASK_TAG, "JSON:\n%s", buffer);
             //ESP_LOGI(WSTASK_TAG, "JSON:\n%s", json_str);
             //ESP_LOG_BUFFER_HEX(WSTASK_TAG, json_str, strlen(json_str));
             esp_websocket_client_send_text(ws_client, buffer, strlen(buffer), portMAX_DELAY);
-            //esp_websocket_client_send_bin(ws_client, (char *) &json_str, strlen(json_str), portMAX_DELAY);
-            //free(json_str);
+        }
+        if (msg.type == MSG_STATUS_GENERIC) {
+            ESP_LOGI(WSTASK_TAG, "MSG_STATUS_GENERIC");
+            cJSON *msg_generic_json = get_generic_msg_json(msg.status.esp_status, msg.status.status);
+            if ( msg_generic_json != NULL && 
+                    cJSON_PrintPreallocated(msg_generic_json, buffer, JSON_BUFFER_SIZE, false) == 0 ) {
+                ESP_LOGE(WEB_TAG, "json_wrap_message_buff: Error guardando JSON en buffer!");
+            }
+            cJSON_Delete(msg_generic_json);
+            esp_websocket_client_send_text(ws_client, buffer, strlen(buffer), portMAX_DELAY);
         }
     }
     vTaskDelete(NULL);
@@ -191,29 +204,83 @@ static void ws_evt_handler_conn(void *handler_args, esp_event_base_t base, int32
 }
 
 // Websocket handler para intercambio de datos
-static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
-{
+static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+    QueueHandle_t *ws_queue = (QueueHandle_t *) handler_args;
     switch (event_id) {
-    case WEBSOCKET_EVENT_DATA:
-        ESP_LOGI(WSTASK_TAG, "WEBSOCKET_EVENT_DATA");
-        ESP_LOGI(WSTASK_TAG, "Received opcode=%d", data->op_code);
-        if (data->op_code == 0x08 && data->data_len == 2) {
-            ESP_LOGW(WSTASK_TAG, "Received closed message with code=%d", 256*data->data_ptr[0] + data->data_ptr[1]);
-        } else {
-            ESP_LOGW(WSTASK_TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
-        }
-        ESP_LOGW(WSTASK_TAG, "Total payload length=%d, data_len=%d, current payload offset=%d", data->payload_len, data->data_len, data->payload_offset);
-        break;
-    case WEBSOCKET_EVENT_ERROR:
-        ESP_LOGI(WSTASK_TAG, "WEBSOCKET_EVENT_ERROR");
-        break;
+        case WEBSOCKET_EVENT_DATA:
+            ESP_LOGI(WSTASK_TAG, "WEBSOCKET_EVENT_DATA");
+            ESP_LOGI(WSTASK_TAG, "Received opcode=%d", data->op_code);
+            if (data->op_code == 0x08 && data->data_len == 2) {
+                ESP_LOGI(WSTASK_TAG, "%s: Received closed message with code=%d"
+                        , __func__ ,256*data->data_ptr[0] + data->data_ptr[1]);
+            } else if (data->op_code == 0xa) {
+                ESP_LOGI(WSTASK_TAG, "%s: Pong", __func__);
+            } else {
+                //ESP_LOGI(WSTASK_TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+                cJSON *msg_json = cJSON_ParseWithLength(data->data_ptr, data->data_len);
+                ws_message_handler(msg_json, ws_queue);
+                cJSON_Delete(msg_json); 
+            }
+            //ESP_LOGI(WSTASK_TAG, "Total payload length=%d, data_len=%d, current payload offset=%d", data->payload_len, data->data_len, data->payload_offset);
+            break;
+        case WEBSOCKET_EVENT_ERROR:
+            ESP_LOGI(WSTASK_TAG, "WEBSOCKET_EVENT_ERROR");
+            break;
+    }
+}
+/*
+ * Función para procesamiento de mensajes del servidor (que no son tramas de
+ * control).
+ *
+ * Argumentos:
+ *      msg : Mensaje en formato JSON
+ *      ws_queue : Handle para la cola de mensajes del WebSocket. Usado para
+ *      envíar respuesta a mensajes que lo necesiten.
+ */
+void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
+    cJSON *msg_type = cJSON_GetObjectItem(msg, "type");
+    if ( !cJSON_IsString(msg_type) && msg_type->valuestring == NULL ) {
+        ESP_LOGE(WSTASK_TAG, "%s: Error parsing", __func__);
+        return; 
+    }
+    if ( strcmp(msg_type->valuestring, "esp-dev-discovery") == 0 ) {
+        /* Habilitar el stack BT/BLE sí no esta habilitado */
+        if (gatt_client_enabled == 0) {
+            ESP_LOGI(WSTASK_TAG, "Habilitando stack BT/BLE...");
+            if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
+                ESP_LOGE(WSTASK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
+                return;
+            }
+            if (init_gatt_client(gattc_ws_callback, ws_queue) != 0) {
+                ESP_LOGE(WSTASK_TAG, "Error levantando cliente GATT!"); 
+                return;
+            } else {
+                gatt_client_enabled = 1;
+            }
+        } 
+        // Discovery...
+    } else {
+        ESP_LOGI(WSTASK_TAG, "Tipo de msg. no reconocido");
     }
 }
 
+/* Callback enviado al proceso de inicialización de BLE */
+void gattc_ws_callback(nodo_gattc_events_t evt, void *arg) {
+    QueueHandle_t *ws_queue = (QueueHandle_t *) arg;
+    if ( evt == DISCOVERY_CMPL) {
+        ws_queue_msg_t msg = {
+            .type = MSG_STATUS_GENERIC,
+            .status = { .esp_status = ESP_OK, .status = DISCOVERY_CMPL, }
+        };
+        xQueueSendToBack(*ws_queue, &msg, portMAX_DELAY);
+    }
+}
+
+
 /*
  * Convertir un vector de mediciones (measure_vector_t) en un objeto JSON
-*/
+ */
 
 int json_wrap_message_buff(enum json_msg_status_t status, enum json_msg_type_t type,  cJSON *content, char *buffer, size_t buffer_len) {
     cJSON *json_msg = cJSON_CreateObject();
@@ -254,6 +321,16 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector, const char *dev_addr) 
     return json_obj;
 }
 
+cJSON *get_generic_msg_json(esp_err_t esp_status, uint8_t status) {
+    cJSON *json_msg = cJSON_CreateObject();
+    cJSON *status_val = cJSON_CreateString( (esp_status == ESP_OK) ? "ESP_OK" : "ESP_ERR" );
+    if (status == DISCOVERY_CMPL) {
+        cJSON_AddItemToObject(json_msg, "status", status_val);
+        cJSON *type_val = cJSON_CreateString(nodo_gattc_event_to_name(DISCOVERY_CMPL));
+        cJSON_AddItemToObject(json_msg, "type", type_val);
+    }
+    return json_msg;
+}
 char *get_timestamp() {
     char buffer[128];
     char *timestamp_ptr;

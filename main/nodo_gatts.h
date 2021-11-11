@@ -1,5 +1,5 @@
-#ifndef NODO_BLE_H
-#define NODO_BLE_H
+#ifndef NODO_GATTS_H
+#define NODO_GATTS_H
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -16,8 +16,8 @@
 #include "nodo_events.h"
 #include "nodo_queue.h"
 
-#define GATT_TAG                    "BLE GATTS"
-#define GATT_TASK_TAG                "GATTS TASK"
+#define GATTS_TAG                   "BLE_GATTS"
+#define GATT_TASK_TAG               "GATTS TASK"
 #define GATTS_APP_ID                0x91                // ID escogido arbitrariamente
 #define PROFILE_NUM                 1
 #define NODO_SERVICE_ID             0
@@ -25,8 +25,8 @@
 #define NODO_DEV_NAME               "IPN-NODO"
 #define SVC_INST_ID                 0
 #define CHAR_DECLARATION_SIZE       (sizeof(uint8_t))
-#define ADV_CONFIG_FLAG             (1 << 0)
-#define SCAN_RSP_CONFIG_FLAG        (1 << 1)
+#define ADV_CONFIG_FLAG             (0x01 << 0)
+#define SCAN_RSP_CONFIG_FLAG        (0x01 << 1)
 #define MTU_SIZE                    500
 #define DEV_BLE_APPEARANCE          0x556               // SIG Appearance Values (Multisensor)
 
@@ -38,7 +38,7 @@ static uint8_t service_uuid[16] = {
     // xxxxxxxx-0000-1000-8000-00805F9B34FB <-- Direción base
     //first uuid, 16bit, [12],[13] is the value
     /* LSB <--------------------------------------------------------------------------------> MSB */
-    0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x31, 0x39, 0x39, 0x31
+    0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x31, 0x39, 0x00, 0x00
 };
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 /* Valores asignados por Bluetooth SIG */
@@ -242,7 +242,7 @@ static esp_ble_adv_params_t adv_params = {
 };
 
 /* Funciones */
-void init_gatt_service(const EventGroupHandle_t evt_group);
+void init_gatt_server(const EventGroupHandle_t evt_group);
 void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);

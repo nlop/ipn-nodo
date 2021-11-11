@@ -12,7 +12,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "nodo_queue.h"
-#include "nodo_ble.h"
+#include "nodo_gatts.h"
 
 #define BT_TAG          "NODO BLUETOOTH"
 #define BT_DEVICE_NAME  "IPN-NODO"
@@ -35,7 +35,7 @@ typedef struct spp_init_ret_t {
 } spp_init_ret_t;
 
 /** Funciones **/
-void nodo_bt_init(void);
+int nodo_bt_init(esp_bt_mode_t mode);
 spp_init_ret_t nodo_bt_spp_init(nodo_spp_recv_cb recv_cb);
 void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param);
 void esp_bt_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param);

@@ -9,7 +9,8 @@
 #include "measure.h"
 #include "esp_sntp.h"
 #include "nodo_mac.h"
-#include "nodo_ble.h"
+#include "nodo_gatts.h"
+#include "nodo_gattc.h"
 
 #define MAIN_TAG "MAIN"
 #define GATT_MODE   true
@@ -19,6 +20,9 @@ enum conn_type_t { CONN_TYPE_GATT, CONN_TYPE_WEBSOCKET };
 int start(enum conn_type_t dev_type, const EventGroupHandle_t evt_group);
 void start_notify_connected_cb(EventGroupHandle_t evt_group, bool connected);
 void sync_time();
+
+/** Variables globales **/
+uint8_t gatt_client_enabled = 0;    /* Variable para establecer sí una estación WiFi tiene nodos hijos con BLE */
 
 void app_main(void) {
     /* TODO:
@@ -70,7 +74,7 @@ void app_main(void) {
         }
     } else if (dev_type == NODO_BLE) {
         ESP_LOGI(MAIN_TAG, "Inicializando BLE GATT mode!");
-        nodo_init_ble(nodo_evt_group); 
+        nodo_init_ble_gatts(nodo_evt_group); 
     } else {
         ESP_LOGI(MAIN_TAG, "No se ha configurado!");
         ESP_LOGI(MAIN_TAG, "Inicializando estación: first boot...");

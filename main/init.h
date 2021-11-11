@@ -10,7 +10,7 @@
 #include "nodo_queue.h"
 #include "nodo_wifi.h"
 #include "nodo_bluetooth.h"
-#include "nodo_ble.h"
+#include "nodo_gatts.h"
 #include "nodo_web.h"
 #include "nodo_events.h"
 #include "nodo_nvs.h"
@@ -23,7 +23,7 @@
 #define MAX_LEN_PSK     64          // Longitud máx. para la PSK según el protocolo 802.11
 
 /* Funciones */
-void nodo_init_ble(const EventGroupHandle_t evt_group);
+void nodo_init_ble_gatts(const EventGroupHandle_t evt_group);
 void nodo_init_dev(EventGroupHandle_t event_group);
 void nodo_init_recv_task(void *pvParameters);
 void send_ap_scanned(nodo_ap_scan_results_t *results);
