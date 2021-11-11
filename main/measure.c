@@ -14,9 +14,10 @@ void measure_task(void *pvParameters) {
     const adc1_channel_t adc_hum = ADC1_CHANNEL_7;
     esp_adc_cal_characteristics_t *adc1_ch6_chars, *adc1_ch7_chars;
     // Preparar dispositivos
-    esp_err_t res;
-    uint32_t adc_value, lm35_vol, hum_vol, lux;
+    uint32_t adc_value, lm35_vol, hum_vol;
 #if CONFIG_TSL2561_ENABLED 
+    uint32_t lux;
+    esp_err_t res;
     /** Configuración TSL2561 **/
     ESP_ERROR_CHECK(i2cdev_init());
     tsl2561_t dev;

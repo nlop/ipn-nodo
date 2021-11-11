@@ -32,5 +32,4 @@ void get_mac_str(uint8_t *src, char *dest) {
         sprintf((char *) &tmp, "%02hX:", src[i]);
         memcpy(dest + i*3, &tmp, 3 * sizeof(uint8_t));
     }
-    dest[MAC_BYTES * 3 - 1] = '\0';
 }
