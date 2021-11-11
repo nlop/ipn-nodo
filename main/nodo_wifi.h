@@ -48,4 +48,5 @@ nodo_ap_scan_results_t nodo_wifi_scan();
 uint8_t get_auth_mode(int authmode);
 void nodo_wifi_set_credentials(uint8_t *ssid, uint8_t *psk);
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+int nodo_wifi_disable(void);
 #endif

@@ -170,3 +170,24 @@ uint8_t get_auth_mode(int authmode)
         break;
     }
 }
+
+int nodo_wifi_disable(void) {
+    esp_err_t ret = esp_wifi_disconnect();
+    if ( ret == ESP_ERR_WIFI_NOT_INIT ) {
+        return 0;
+    }
+    if ( ret != ESP_OK && ret != ESP_ERR_WIFI_NOT_STARTED ) {
+        ESP_LOGE(WIFI_TAG, "%s: Error desconectando [code %s]", __func__, esp_err_to_name(ret));
+    }
+    ret = esp_wifi_stop();
+    if ( ret != ESP_OK ) {
+        ESP_LOGE(WIFI_TAG, "%s: Error parando controlador [code %s]", __func__,esp_err_to_name(ret));
+        return -1;
+    }
+    ret = esp_wifi_deinit();
+    if ( ret != ESP_OK ) {
+        ESP_LOGE(WIFI_TAG, "%s: Error deshabilitando controlador [code %s]", __func__,esp_err_to_name(ret));
+        return -1;
+    }
+    return 0;
+}
