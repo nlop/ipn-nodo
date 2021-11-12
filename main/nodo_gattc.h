@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include "nvs.h"
 #include "nvs_flash.h"
-
 #include "esp_bt.h"
 #include "esp_gap_ble_api.h"
 #include "esp_gattc_api.h"
@@ -16,8 +15,9 @@
 #include "esp_gatt_common_api.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 
-#define GATTC_TAG                   "GATTC_DEMO"
+#define GATTC_TAG                   "NODO_GATTC"
 #define REMOTE_SERVICE_UUID         0x3931
 #define REMOTE_NOTIFY_CHAR_UUID     0xFF01
 #define TEMP_CHAR_UUID              0x2A6E
@@ -39,6 +39,11 @@ struct gattc_profile_inst {
     uint16_t char_handle;
     esp_bd_addr_t remote_bda;
 };
+
+typedef struct gattc_ws_init_arg_t {
+    QueueHandle_t ws_queue;
+    uint8_t *server_addr;
+} gattc_ws_init_arg_t;
 
 /** Callbacks **/
 typedef void (*gattc_discovery_cb_t) (nodo_gattc_events_t evt, void* arg);

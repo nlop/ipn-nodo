@@ -13,11 +13,14 @@
 #include "esp_event.h"
 #include "cJSON.h"
 #include "nodo_events.h"
+#include "nodo_def.h"
 #include "nodo_queue.h"
 #include "nodo_json.h"
 #include "nodo_mac.h"
 #include "nodo_bluetooth.h"
 #include "nodo_gattc.h"
+#include "nodo_spiffs.h"
+#include "nodo_nvs.h"
 
 #define WEB_TAG             "NODO WEB"
 #define WSTASK_TAG          "WS TASK"
@@ -46,6 +49,8 @@ typedef struct token_ret_t {
     uint8_t http_status;
     uint8_t *token;
 } token_ret_t;
+
+
 
 typedef struct ws_task_arg_t {
     QueueHandle_t out_queue;                /* Cola para recibir paquetes enviados por otros tasks */

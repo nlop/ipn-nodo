@@ -11,18 +11,22 @@
 #include "nodo_mac.h"
 #include "nodo_gatts.h"
 #include "nodo_gattc.h"
+#include "nodo_spiffs.h"
 
 #define MAIN_TAG "MAIN"
 #define GATT_MODE   true
 enum conn_type_t { CONN_TYPE_GATT, CONN_TYPE_WEBSOCKET };
 
 // Declaraciones
-int start(enum conn_type_t dev_type, const EventGroupHandle_t evt_group);
+int start(dev_type_t dev_type, const EventGroupHandle_t evt_group);
 void start_notify_connected_cb(EventGroupHandle_t evt_group, bool connected);
 void sync_time();
+int load_gattc_db(void);
 
 /** Variables globales **/
-uint8_t gatt_client_enabled = 0;    /* Variable para establecer sí una estación WiFi tiene nodos hijos con BLE */
+db_entries_t gattc_db = {0};
+
+dev_type_t dev_type = 0;            /* Tipo de dispositivo que esta corriendo (BLE, WIFI, WIFI + BLE) */
 
 void app_main(void) {
     /* TODO:
@@ -50,9 +54,19 @@ void app_main(void) {
         return;
     }
     /* Buscar el tipo de dispositivo */
-    uint8_t dev_type = nvs_get_mode();
-    if (dev_type == NODO_WIFI) {
-        ESP_LOGI(MAIN_TAG, "Inicializando WiFi mode!");
+    uint8_t nvs_dev_type = nvs_get_mode();
+    dev_type = nvs_dev_type;
+    switch (dev_type) {
+        case NODO_WIFI:
+            ESP_LOGI(MAIN_TAG, "%s| Iniciando NODO_WIFI", __func__);
+            break;
+        case NODO_BLE:
+            ESP_LOGI(MAIN_TAG, "%s| Iniciando NODO_BLE", __func__);
+            break;
+        case SINKNODE:
+            ESP_LOGI(MAIN_TAG, "%s| Iniciando SINKNODE", __func__);
+    }
+    if (dev_type == NODO_WIFI || dev_type == SINKNODE) {
         /*
          * Buscar en la NVS las llaves NVS_AP_PART.AP_SSID/AP_PSK para saber si la
          * estación ha sido inicializada anteriormente
@@ -66,14 +80,11 @@ void app_main(void) {
             nodo_wifi_set_credentials(ssid, psk);
             /* Sincronizar el tiempo con NTP */
             sync_time();
-            ESP_LOGI(MAIN_TAG, "%s: Arrancando tareas...", __func__);
-            //start(CONN_TYPE_WEBSOCKET, nodo_evt_group);
         } else {
             ESP_LOGI(MAIN_TAG, "No se ha configurado!\nInicializando estación: first boot...");
             nodo_init_dev(nodo_evt_group);
         }
     } else if (dev_type == NODO_BLE) {
-        ESP_LOGI(MAIN_TAG, "Inicializando BLE GATT mode!");
         nodo_init_ble_gatts(nodo_evt_group); 
     } else {
         ESP_LOGI(MAIN_TAG, "No se ha configurado!");
@@ -86,10 +97,7 @@ void app_main(void) {
         }
     }
     ESP_LOGI(MAIN_TAG, "%s: Arrancando tareas...", __func__);
-    if (dev_type == NODO_BLE)
-        start(CONN_TYPE_GATT, nodo_evt_group);
-    else
-        start(CONN_TYPE_WEBSOCKET, nodo_evt_group);
+    start(dev_type, nodo_evt_group);
 }
 
 /*
@@ -99,12 +107,12 @@ void app_main(void) {
  *      evt_group: Handle para el grupo de eventos que marca eventos relevantes
  *      del nodo
  */
-int start(enum conn_type_t conn_type, const EventGroupHandle_t evt_group) {
+int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
     QueueHandle_t queue_out;
     TaskHandle_t ws_task_handle, meas_task_handle;
     BaseType_t ret;
-    if (conn_type == CONN_TYPE_WEBSOCKET) {
-        ESP_LOGD(MAIN_TAG, "Arrancado task WebSocket...");
+    if (dev_type == NODO_WIFI || dev_type == SINKNODE) {
+        ESP_LOGI(MAIN_TAG, "Arrancado task WebSocket...");
         // Leer token para servicios web
         uint8_t *token;
         if ( (token = nvs_get_token()) == NULL) {
@@ -112,21 +120,26 @@ int start(enum conn_type_t conn_type, const EventGroupHandle_t evt_group) {
             return -1;
         }
         queue_out = xQueueCreate(WS_QUEUE_LEN, sizeof(ws_queue_msg_t));
-        // Arrancar Task WEBSOCKET 
+        // Arrancar Task WEBSOCKET
         ws_task_arg_t *ws_arg = (ws_task_arg_t *) calloc(1, sizeof(ws_task_arg_t));
         ws_arg->token = token;
         ws_arg->nodo_evt_group = evt_group;
         ws_arg->out_queue = queue_out;
         ret = xTaskCreate(
-                websocket_task, 
-                "websocket_task", 
-                configMINIMAL_STACK_SIZE * 4,
+                websocket_task,
+                "websocket_task",
+                configMINIMAL_STACK_SIZE * 8,
                 (void *) ws_arg,
                 5,
                 &ws_task_handle);
         if (ret == pdFALSE) {
             ESP_LOGE(MAIN_TAG, "%s: Error creando websocket_task", __func__);
             return -1;
+        }
+        if (dev_type == SINKNODE) {
+            if ( load_gattc_db() != 0 ) {
+                ESP_LOGE(MAIN_TAG, "%s| Error cargando GATTC DB!", __func__);
+            }
         }
     } else {
         ESP_LOGD(MAIN_TAG, "Arrancado task GATT...");
@@ -153,7 +166,7 @@ int start(enum conn_type_t conn_type, const EventGroupHandle_t evt_group) {
     ret = xTaskCreate(
             measure_task, 
             "measure_task", 
-            configMINIMAL_STACK_SIZE * 4,
+            configMINIMAL_STACK_SIZE * 6,
             (void *) meas_arg,
             5,
             &meas_task_handle);
@@ -174,6 +187,25 @@ void start_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
         ESP_LOGI(MAIN_TAG, "start_notify_connected_cb: Falló conexión. Credenciales incorrectas!");
         xEventGroupClearBits(evt_group, COMM_CHANNEL_OK);
     }
+}
+
+int load_gattc_db(void) {
+    if ( ( spiffs_mounted() != 0 ) && ( spiffs_mount() != 0 ) ) {
+        ESP_LOGE(WSTASK_TAG, "%s| Error montando SPIFFS!", __func__);
+        return -1;
+    } else {
+        int ret = spiffs_get_all(&gattc_db);
+        if ( ret != 0 ) {
+            ESP_LOGE(MAIN_TAG, "%s| Error leyendo GATTC_DB!", __func__);
+            return -1;
+        }
+        for ( uint8_t i = 0; i < gattc_db.len; i++) {
+            ESP_LOGI(MAIN_TAG, "DEV #%d", i);
+            ESP_LOG_BUFFER_HEX(MAIN_TAG, gattc_db.data[i], ENTRY_LEN);
+        }
+        spiffs_umount();
+    }
+    return 0;
 }
 
 void sync_time() {

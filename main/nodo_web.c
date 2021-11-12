@@ -14,8 +14,7 @@ char *get_timestamp();
 void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue);
 cJSON *get_generic_msg_json(esp_err_t esp_status, uint8_t status);
 
-extern uint8_t gatt_client_enabled;
-
+extern dev_type_t dev_type;
 
 /*
  * Configuración del cliente HTTP para enviar el token
@@ -203,7 +202,7 @@ static void ws_evt_handler_conn(void *handler_args, esp_event_base_t base, int32
     }
 }
 
-// Websocket handler para intercambio de datos
+// Websocket handler para intercambio de paquetes de datos
 static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
     QueueHandle_t *ws_queue = (QueueHandle_t *) handler_args;
@@ -217,8 +216,12 @@ static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32
             } else if (data->op_code == 0xa) {
                 ESP_LOGI(WSTASK_TAG, "%s: Pong", __func__);
             } else {
-                //ESP_LOGI(WSTASK_TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+                ESP_LOGI(WSTASK_TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
                 cJSON *msg_json = cJSON_ParseWithLength(data->data_ptr, data->data_len);
+                if (msg_json == NULL) {
+                    ESP_LOGE(WSTASK_TAG, "%s Error parsing message", __func__);
+                    break;
+                }
                 ws_message_handler(msg_json, ws_queue);
                 cJSON_Delete(msg_json); 
             }
@@ -229,6 +232,7 @@ static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32
             break;
     }
 }
+
 /*
  * Función para procesamiento de mensajes del servidor (que no son tramas de
  * control).
@@ -239,41 +243,77 @@ static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32
  *      envíar respuesta a mensajes que lo necesiten.
  */
 void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
+    ESP_LOGI(WSTASK_TAG, "%s", __func__);
     cJSON *msg_type = cJSON_GetObjectItem(msg, "type");
     if ( !cJSON_IsString(msg_type) && msg_type->valuestring == NULL ) {
-        ESP_LOGE(WSTASK_TAG, "%s: Error parsing", __func__);
+        ESP_LOGE(WSTASK_TAG, "%s: Error parsing type", __func__);
+        return; 
+    }
+    cJSON *content = cJSON_GetObjectItem(msg, "content");
+    if (!cJSON_IsObject(content)) {
+        ESP_LOGE(WSTASK_TAG, "%s: Error parsing content", __func__);
         return; 
     }
     if ( strcmp(msg_type->valuestring, "esp-dev-discovery") == 0 ) {
+        uint8_t *addr;
+        /* Preparar el argumento para el callback */
+        gattc_ws_init_arg_t *arg = (gattc_ws_init_arg_t *) calloc(1, sizeof(gattc_ws_init_arg_t));
+        arg->ws_queue = *ws_queue;
+        cJSON *child = cJSON_GetObjectItem(content, "child");
+
+        if ( ( addr = parse_u8_array(child, ENTRY_LEN) ) == NULL ) {
+            return;
+        }
+        ESP_LOG_BUFFER_HEX(WSTASK_TAG, addr, ENTRY_LEN);
+        arg->server_addr = addr;
         /* Habilitar el stack BT/BLE sí no esta habilitado */
-        if (gatt_client_enabled == 0) {
-            ESP_LOGI(WSTASK_TAG, "Habilitando stack BT/BLE...");
+        if (dev_type == NODO_WIFI) {
+            ESP_LOGI(WSTASK_TAG, "%s: Habilitando stack BT/BLE...", __func__);
             if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
                 ESP_LOGE(WSTASK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
                 return;
             }
-            if (init_gatt_client(gattc_ws_callback, ws_queue) != 0) {
-                ESP_LOGE(WSTASK_TAG, "Error levantando cliente GATT!"); 
+            if (init_gatt_client(gattc_ws_callback, arg) != 0) {
+                ESP_LOGE(WSTASK_TAG, "%s: Error levantando cliente GATT!", __func__); 
                 return;
-            } else {
-                gatt_client_enabled = 1;
             }
-        } 
+        }
+        ESP_LOGI(WSTASK_TAG, "%s| Done!", __func__);
         // Discovery...
     } else {
-        ESP_LOGI(WSTASK_TAG, "Tipo de msg. no reconocido");
+        ESP_LOGW(WSTASK_TAG, "Tipo de msg. no reconocido");
     }
 }
 
 /* Callback enviado al proceso de inicialización de BLE */
-void gattc_ws_callback(nodo_gattc_events_t evt, void *arg) {
-    QueueHandle_t *ws_queue = (QueueHandle_t *) arg;
+void gattc_ws_callback(nodo_gattc_events_t evt, void *cb_arg) {
+    gattc_ws_init_arg_t *arg = (gattc_ws_init_arg_t *) cb_arg;
     if ( evt == DISCOVERY_CMPL) {
         ws_queue_msg_t msg = {
             .type = MSG_STATUS_GENERIC,
             .status = { .esp_status = ESP_OK, .status = DISCOVERY_CMPL, }
         };
-        xQueueSendToBack(*ws_queue, &msg, portMAX_DELAY);
+        xQueueSendToBack(arg->ws_queue, &msg, portMAX_DELAY);
+        /* Guardar en SPIFFS */
+        if ( ( dev_type == NODO_WIFI ) &&  ( spiffs_init() != 0 ) ) {
+            ESP_LOGE(WSTASK_TAG, "%s| Error inicializando almacenamiento SPIFFS!", __func__);
+            return;
+        }
+        if ( ( spiffs_mounted() != 0 ) && ( spiffs_mount() != 0 ) ) {
+            ESP_LOGE(WSTASK_TAG, "%s| Error montando SPIFFS!", __func__);
+            return;
+        }
+        if (spiffs_add_entry(arg->server_addr) != 0 ) {
+            ESP_LOGE(WSTASK_TAG, "%s| Error guardando entrada!", __func__);
+            return;
+        }
+        if ( nvs_set_mode(SINKNODE) != 0 ) {
+            ESP_LOGE(WSTASK_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
+        }
+        free(arg->server_addr);
+        free(arg);
+        spiffs_umount();
+        ESP_LOGI(WSTASK_TAG, "SINKNODE init done!");
     }
 }
 

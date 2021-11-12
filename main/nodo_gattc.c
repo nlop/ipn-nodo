@@ -29,8 +29,7 @@ esp_ble_scan_params_t ble_scan_params = {
     .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
 
-//static const char remote_device_name[] = "ESP_GATTS_DEMO";
-const uint8_t child_addr [] = {0xec, 0x94, 0xcb, 0x4d, 0xac, 0x76};
+uint8_t child_addr [6];
 bool connect    = false;
 bool get_server = false;
 esp_gattc_char_elem_t *char_elem_result   = NULL;
@@ -429,6 +428,10 @@ void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_ga
 int init_gatt_client(gattc_discovery_cb_t disco_cb, void *cb_arg){
     discovery_cb = disco_cb;
     discovery_cb_arg = cb_arg;
+    /* Guardar la dirección del nodo hijo */
+    gattc_ws_init_arg_t *tmp_arg = (gattc_ws_init_arg_t *) cb_arg; 
+    memcpy(child_addr, tmp_arg->server_addr, 6);
+    ESP_LOG_BUFFER_HEX(GATTC_TAG, child_addr, 6);
     //esp_bt_controller_status_t status = esp_bt_controller_get_status();
     //switch(status) {
     //    case ESP_BT_CONTROLLER_STATUS_IDLE:
