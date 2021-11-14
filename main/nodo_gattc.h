@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
@@ -14,16 +16,24 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
+#include "nodo_queue.h"
 
 #define GATTC_TAG                   "NODO_GATTC"
-#define REMOTE_SERVICE_UUID         0x3931
-#define REMOTE_NOTIFY_CHAR_UUID     0xFF01
-#define TEMP_CHAR_UUID              0x2A6E
 #define PROFILE_NUM                 1
 #define NODO_PROFILE_ID             0
 #define INVALID_HANDLE              0
+#define MAC_ADDR_LEN                6
+#define GATTC_SCAN_TIMEOUT          30                  /* Tiempo para escanear servidores BLE */
+/* TODO: Pasar a config ^^^^ */
+
+/** UUIDs importantes **/
+#define REMOTE_SERVICE_UUID         0x3931
+#define REMOTE_NOTIFY_CHAR_UUID     0xFF01
+#define TEMP_CHAR_UUID              0x2A6E
+#define TEST_DISCOVERY_UUID         0xFF00
+#define HUMIDITY_CHAR_UUID          0x2A6F
+#define LUX_CHAR_UUID               0x2AFB
+
 
 /** Enums **/
 typedef enum {DISCOVERY_CMPL} nodo_gattc_events_t;
@@ -45,6 +55,17 @@ typedef struct gattc_ws_init_arg_t {
     uint8_t *server_addr;
 } gattc_ws_init_arg_t;
 
+typedef struct gattc_char_t {
+    esp_bt_uuid_t   uuid;
+    uint16_t        value;
+    uint16_t        handle;
+} gattc_char_t;
+
+typedef struct gattc_char_vec_t {
+    gattc_char_t        *chars;
+    uint8_t             len;
+} gattc_char_vec_t;
+
 /** Callbacks **/
 typedef void (*gattc_discovery_cb_t) (nodo_gattc_events_t evt, void* arg);
 
@@ -52,7 +73,11 @@ typedef void (*gattc_discovery_cb_t) (nodo_gattc_events_t evt, void* arg);
 void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
-int init_gatt_client(gattc_discovery_cb_t disco_cb, void *cb_arg);
+int init_gatt_client(gattc_discovery_cb_t disco_cb, const QueueHandle_t queue);
 const char *nodo_gattc_event_to_name(nodo_gattc_events_t evt);
+uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len);
+void set_addr(const uint8_t *addr);
+int set_chars(const uint16_t *chars, uint8_t chars_len);
+int nodo_gattc_start(void);
 
 #endif

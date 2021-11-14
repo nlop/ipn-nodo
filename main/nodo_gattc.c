@@ -1,26 +1,22 @@
 #include "nodo_gattc.h"
 
 /* GATT Server char UUIDs */
-esp_bt_uuid_t remote_filter_service_uuid = {
+static esp_bt_uuid_t remote_filter_service_uuid = {
     .len = ESP_UUID_LEN_16,
-    .uuid = {.uuid16 = REMOTE_SERVICE_UUID,},
+    .uuid = {.uuid16 =  REMOTE_SERVICE_UUID,},
 };
-//
-//static esp_bt_uuid_t remote_filter_char_uuid = {
-//    .len = ESP_UUID_LEN_16,
-//    .uuid = {.uuid16 = REMOTE_NOTIFY_CHAR_UUID,},
-//};
-esp_bt_uuid_t temperature_char_uuid = {
+
+static esp_bt_uuid_t test_discovery_uuid = {
+    .len = ESP_UUID_LEN_16,
+    .uuid = {.uuid16 =  TEST_DISCOVERY_UUID,},
+};
+
+static esp_bt_uuid_t temperature_char_uuid = {
     .len = ESP_UUID_LEN_16,
     .uuid = {.uuid16 = TEMP_CHAR_UUID,},
 };
-//
-//static esp_bt_uuid_t notify_descr_uuid = {
-//    .len = ESP_UUID_LEN_16,
-//    .uuid = {.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG,},
-//};
 
-esp_ble_scan_params_t ble_scan_params = {
+static esp_ble_scan_params_t ble_scan_params = {
     .scan_type              = BLE_SCAN_TYPE_ACTIVE,
     .own_addr_type          = BLE_ADDR_TYPE_PUBLIC,
     .scan_filter_policy     = BLE_SCAN_FILTER_ALLOW_ALL,
@@ -29,13 +25,21 @@ esp_ble_scan_params_t ble_scan_params = {
     .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
 
-uint8_t child_addr [6];
-bool connect    = false;
-bool get_server = false;
-esp_gattc_char_elem_t *char_elem_result   = NULL;
-esp_gattc_descr_elem_t *descr_elem_result = NULL;
-gattc_discovery_cb_t discovery_cb;
-void *discovery_cb_arg;
+static uint8_t child_addr [6];
+static bool client_init_ok = false;
+static bool connect    = false;
+static bool get_server = false;
+// gattc_discovery_cb_t discovery_cb;
+// void *discovery_cb_arg;
+/* Cola para enviar datos (ws) */
+QueueHandle_t out_queue;
+/* Arreglo de estructuras con datos de las características */
+static gattc_char_vec_t server_chars = { .chars = NULL, .len = 0 };
+/* Variables para measure_vector */
+static measure_t measure_data[3];
+static measure_vector_t meas_vec = {.data = measure_data, .len = 3};
+/* Contenedor para mensajes al ws */
+static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR, .meas_vector = &meas_vec };
 
 
 /* One gatt-based profile one app_id and one gattc_if, this array will store the gattc_if returned by ESP_GATTS_REG_EVT */
@@ -49,7 +53,7 @@ struct gattc_profile_inst gl_profile_tab[PROFILE_NUM] = {
 void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
 {
     esp_ble_gattc_cb_param_t *p_data = (esp_ble_gattc_cb_param_t *)param;
-
+    static uint8_t read_chars = 0;
     switch (event) {
     case ESP_GATTC_REG_EVT:
         ESP_LOGI(GATTC_TAG, "REG_EVT");
@@ -124,149 +128,44 @@ void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc
         }
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_SEARCH_CMPL_EVT");
         if (get_server){
+            esp_gattc_char_elem_t char_elem_result = {0};
             uint16_t count = 1;
-            char_elem_result = (esp_gattc_char_elem_t *)malloc(sizeof(esp_gattc_char_elem_t) * count);
-            esp_gatt_status_t status = esp_ble_gattc_get_char_by_uuid(gattc_if,
-                                                     p_data->search_cmpl.conn_id,
-                                                     gl_profile_tab[NODO_PROFILE_ID].service_start_handle,
-                                                     gl_profile_tab[NODO_PROFILE_ID].service_end_handle,
-                                                     temperature_char_uuid,
-                                                     char_elem_result,
-                                                     &count);
-            if (status != ESP_GATT_OK){
-                ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_char_by_uuid error");
+            for( uint8_t i = 0; i < server_chars.len; i++) {
+                //char_elem_result = (esp_gattc_char_elem_t *)malloc(sizeof(esp_gattc_char_elem_t) * count);
+                if ( server_chars.chars[i].handle == 0 ) {
+                    esp_gatt_status_t status = esp_ble_gattc_get_char_by_uuid(gattc_if,
+                                                             p_data->search_cmpl.conn_id,
+                                                             gl_profile_tab[NODO_PROFILE_ID].service_start_handle,
+                                                             gl_profile_tab[NODO_PROFILE_ID].service_end_handle,
+                                                             server_chars.chars[i].uuid,
+                                                             &char_elem_result,
+                                                             &count);
+                    if (status != ESP_GATT_OK){
+                        ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_char_by_uuid error");
+                    } else {
+                        server_chars.chars[i].handle = char_elem_result.char_handle;
+                    }
+                }
+                esp_err_t ret = esp_ble_gattc_read_char(gattc_if,
+                        p_data->search_cmpl.conn_id,
+                        server_chars.chars[i].handle,
+                        ESP_GATT_AUTH_REQ_NONE);
+                if(ret != ESP_OK) {
+                    ESP_LOGE(GATTC_TAG, "Error leyendo temperatura %s", esp_err_to_name(ret));
+                }
             }
-            esp_err_t ret = esp_ble_gattc_read_char(gattc_if,
-                    p_data->search_cmpl.conn_id,
-                    char_elem_result->char_handle,
-                    ESP_GATT_AUTH_REQ_NONE);
-            if(ret != ESP_OK) {
-                ESP_LOGE(GATTC_TAG, "Error leyendo temperatura %s", esp_err_to_name(ret));
-            }
-            discovery_cb(DISCOVERY_CMPL, discovery_cb_arg); 
-            //esp_gatt_status_t status = esp_ble_gattc_get_attr_count( gattc_if,
-            //                                                         p_data->search_cmpl.conn_id,
-            //                                                         ESP_GATT_DB_CHARACTERISTIC,
-            //                                                         gl_profile_tab[NODO_PROFILE_ID].service_start_handle,
-            //                                                         gl_profile_tab[NODO_PROFILE_ID].service_end_handle,
-            //                                                         INVALID_HANDLE,
-            //                                                         &count);
-            //if (status != ESP_GATT_OK){
-            //    ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_attr_count error");
-            //}
-
-            //if (count > 0){
-            //    char_elem_result = (esp_gattc_char_elem_t *)malloc(sizeof(esp_gattc_char_elem_t) * count);
-            //    if (!char_elem_result){
-            //        ESP_LOGE(GATTC_TAG, "gattc no mem");
-            //    }else{
-            //        status = esp_ble_gattc_get_char_by_uuid( gattc_if,
-            //                                                 p_data->search_cmpl.conn_id,
-            //                                                 gl_profile_tab[NODO_PROFILE_ID].service_start_handle,
-            //                                                 gl_profile_tab[NODO_PROFILE_ID].service_end_handle,
-            //                                                 remote_filter_char_uuid,
-            //                                                 char_elem_result,
-            //                                                 &count);
-            //        if (status != ESP_GATT_OK){
-            //            ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_char_by_uuid error");
-            //        }
-
-            //        /*  Every service have only one char in our 'ESP_GATTS_DEMO' demo, so we used first 'char_elem_result' */
-            //        if (count > 0 && (char_elem_result[0].properties & ESP_GATT_CHAR_PROP_BIT_NOTIFY)){
-            //            gl_profile_tab[NODO_PROFILE_ID].char_handle = char_elem_result[0].char_handle;
-            //            esp_ble_gattc_register_for_notify (gattc_if, gl_profile_tab[NODO_PROFILE_ID].remote_bda, char_elem_result[0].char_handle);
-            //        }
-            //    }
-            //    /* free char_elem_result */
-            //    free(char_elem_result);
-            //}else{
-            //    ESP_LOGE(GATTC_TAG, "no char found");
-            //}
+            //discovery_cb(DISCOVERY_CMPL, discovery_cb_arg); 
+            // TODO: EN lugar de llamar a la CB para notificar el
+            // descubrimiento, mandar un mensaje desde este módulo, filtrando
+            // el UUID de la característica especial para la inicialización
         }
-         break;
+        break;
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_REG_FOR_NOTIFY_EVT");
-        //if (p_data->reg_for_notify.status != ESP_GATT_OK){
-        //    ESP_LOGE(GATTC_TAG, "REG FOR NOTIFY failed: error status = %d", p_data->reg_for_notify.status);
-        //}else{
-        //    uint16_t count = 0;
-        //    uint16_t notify_en = 1;
-        //    esp_gatt_status_t ret_status = esp_ble_gattc_get_attr_count( gattc_if,
-        //                                                                 gl_profile_tab[NODO_PROFILE_ID].conn_id,
-        //                                                                 ESP_GATT_DB_DESCRIPTOR,
-        //                                                                 gl_profile_tab[NODO_PROFILE_ID].service_start_handle,
-        //                                                                 gl_profile_tab[NODO_PROFILE_ID].service_end_handle,
-        //                                                                 gl_profile_tab[NODO_PROFILE_ID].char_handle,
-        //                                                                 &count);
-        //    if (ret_status != ESP_GATT_OK){
-        //        ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_attr_count error");
-        //    }
-        //    if (count > 0){
-        //        descr_elem_result = malloc(sizeof(esp_gattc_descr_elem_t) * count);
-        //        if (!descr_elem_result){
-        //            ESP_LOGE(GATTC_TAG, "malloc error, gattc no mem");
-        //        }else{
-        //            ret_status = esp_ble_gattc_get_descr_by_char_handle( gattc_if,
-        //                                                                 gl_profile_tab[NODO_PROFILE_ID].conn_id,
-        //                                                                 p_data->reg_for_notify.handle,
-        //                                                                 notify_descr_uuid,
-        //                                                                 descr_elem_result,
-        //                                                                 &count);
-        //            if (ret_status != ESP_GATT_OK){
-        //                ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_descr_by_char_handle error");
-        //            }
-        //            /* Every char has only one descriptor in our 'ESP_GATTS_DEMO' demo, so we used first 'descr_elem_result' */
-        //            if (count > 0 && descr_elem_result[0].uuid.len == ESP_UUID_LEN_16 && descr_elem_result[0].uuid.uuid.uuid16 == ESP_GATT_UUID_CHAR_CLIENT_CONFIG){
-        //                ret_status = esp_ble_gattc_write_char_descr( gattc_if,
-        //                                                             gl_profile_tab[NODO_PROFILE_ID].conn_id,
-        //                                                             descr_elem_result[0].handle,
-        //                                                             sizeof(notify_en),
-        //                                                             (uint8_t *)&notify_en,
-        //                                                             ESP_GATT_WRITE_TYPE_RSP,
-        //                                                             ESP_GATT_AUTH_REQ_NONE);
-        //            }
-
-        //            if (ret_status != ESP_GATT_OK){
-        //                ESP_LOGE(GATTC_TAG, "esp_ble_gattc_write_char_descr error");
-        //            }
-
-        //            /* free descr_elem_result */
-        //            free(descr_elem_result);
-        //        }
-        //    }
-        //    else{
-        //        ESP_LOGE(GATTC_TAG, "decsr not found");
-        //    }
-
-        //}
         break;
     }
     case ESP_GATTC_NOTIFY_EVT:
-        if (p_data->notify.is_notify){
-            ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive notify value:");
-        }else{
-            ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive indicate value:");
-        }
-        esp_log_buffer_hex(GATTC_TAG, p_data->notify.value, p_data->notify.value_len);
-        break;
-    case ESP_GATTC_WRITE_DESCR_EVT:
-        if (p_data->write.status != ESP_GATT_OK){
-            ESP_LOGE(GATTC_TAG, "write descr failed, error status = %x", p_data->write.status);
-            break;
-        }
-        ESP_LOGI(GATTC_TAG, "write descr success ");
-        uint8_t write_char_data[35];
-        for (int i = 0; i < sizeof(write_char_data); ++i)
-        {
-            write_char_data[i] = i % 256;
-        }
-        esp_ble_gattc_write_char( gattc_if,
-                                  gl_profile_tab[NODO_PROFILE_ID].conn_id,
-                                  gl_profile_tab[NODO_PROFILE_ID].char_handle,
-                                  sizeof(write_char_data),
-                                  write_char_data,
-                                  ESP_GATT_WRITE_TYPE_RSP,
-                                  ESP_GATT_AUTH_REQ_NONE);
+        ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT");
         break;
     case ESP_GATTC_SRVC_CHG_EVT: {
         esp_bd_addr_t bda;
@@ -294,6 +193,16 @@ void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc
             break;
         }
         esp_log_buffer_hex(GATTC_TAG, p_data->read.value, p_data->read.value_len);
+        for(uint8_t i = 0; i < server_chars.len; i++) {
+            if ( server_chars.chars[i].handle == p_data->read.handle && p_data->read.value != NULL ) {
+                server_chars.chars[i].value = u16_from_bytes(p_data->read.value, p_data->read.value_len);
+                read_chars += 1;
+            }
+            /* Verificar si ya se leyeron todas las propiedades */
+            if ( read_chars == server_chars.len ) {
+
+            }
+        }
         break;
     default:
         break;
@@ -302,13 +211,9 @@ void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc
 
 void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
-    uint8_t *adv_name = NULL;
-    uint8_t adv_name_len = 0;
     switch (event) {
     case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
-        //the unit of the duration is second
-        uint32_t duration = 30;
-        esp_ble_gap_start_scanning(duration);
+        client_init_ok = true;
         break;
     }
     case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
@@ -329,35 +234,15 @@ void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
             /* Ver /components/bt/host/bluedroid/api/include/api/esp_gap_ble_api.h:228 para resolver otros tipos */
             /* adv_name = esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv,
                                                 ESP_BLE_AD_TYPE_NAME_CMPL, &adv_name_len); */
-            ESP_LOGI(GATTC_TAG, "searched Device Name Len %d", adv_name_len);
-            esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
+            //ESP_LOGI(GATTC_TAG, "searched Device Name Len %d", adv_name_len);
+            //esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
+            /* ¿La dirección del disp. detectado es la del que buscamos? */
             if (memcmp( scan_result->scan_rst.bda, child_addr, 6) == 0) {
                 ESP_LOGI(GATTC_TAG, "Dispositivo encontrado!");
                 esp_ble_gap_stop_scanning();
                 esp_ble_gattc_open(gl_profile_tab[NODO_PROFILE_ID].gattc_if, scan_result->scan_rst.bda, scan_result->scan_rst.ble_addr_type, true);
             }
-//#if CONFIG_EXAMPLE_DUMP_ADV_DATA_AND_SCAN_RESP
-//            if (scan_result->scan_rst.adv_data_len > 0) {
-//                ESP_LOGI(GATTC_TAG, "adv data:");
-//                esp_log_buffer_hex(GATTC_TAG, &scan_result->scan_rst.ble_adv[0], scan_result->scan_rst.adv_data_len);
-//            }
-//            if (scan_result->scan_rst.scan_rsp_len > 0) {
-//                ESP_LOGI(GATTC_TAG, "scan resp:");
-//                esp_log_buffer_hex(GATTC_TAG, &scan_result->scan_rst.ble_adv[scan_result->scan_rst.adv_data_len], scan_result->scan_rst.scan_rsp_len);
-//            }
-//#endif
             ESP_LOGI(GATTC_TAG, "\n");
-            //if (adv_name != NULL) {
-            //    if (strlen(remote_device_name) == adv_name_len && strncmp((char *)adv_name, remote_device_name, adv_name_len) == 0) {
-            //        ESP_LOGI(GATTC_TAG, "searched device %s\n", remote_device_name);
-            //        if (connect == false) {
-            //            connect = true;
-            //            ESP_LOGI(GATTC_TAG, "connect to the remote device.");
-            //            esp_ble_gap_stop_scanning();
-            //            esp_ble_gattc_open(gl_profile_tab[NODO_PROFILE_ID].gattc_if, scan_result->scan_rst.bda, scan_result->scan_rst.ble_addr_type, true);
-            //        }
-            //    }
-            //}
             break;
         case ESP_GAP_SEARCH_INQ_CMPL_EVT:
             break;
@@ -425,28 +310,9 @@ void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_ga
     } while (0);
 }
 
-int init_gatt_client(gattc_discovery_cb_t disco_cb, void *cb_arg){
-    discovery_cb = disco_cb;
-    discovery_cb_arg = cb_arg;
-    /* Guardar la dirección del nodo hijo */
-    gattc_ws_init_arg_t *tmp_arg = (gattc_ws_init_arg_t *) cb_arg; 
-    memcpy(child_addr, tmp_arg->server_addr, 6);
-    ESP_LOG_BUFFER_HEX(GATTC_TAG, child_addr, 6);
-    //esp_bt_controller_status_t status = esp_bt_controller_get_status();
-    //switch(status) {
-    //    case ESP_BT_CONTROLLER_STATUS_IDLE:
-    //        ESP_LOGE(GATTC_TAG, "[BT STATUS] IDLE");
-    //        break;
-    //    case ESP_BT_CONTROLLER_STATUS_INITED:
-    //        ESP_LOGE(GATTC_TAG, "[BT STATUS] INITED");
-    //        break;
-    //    case ESP_BT_CONTROLLER_STATUS_ENABLED:
-    //        ESP_LOGE(GATTC_TAG, "[BT STATUS] ENABLED");
-    //        break;
-    //    case ESP_BT_CONTROLLER_STATUS_NUM:
-    //        ESP_LOGE(GATTC_TAG, "[BT STATUS] NUM");
-    //        break;
-    //}
+int init_gatt_client(gattc_discovery_cb_t disco_cb, const QueueHandle_t queue){
+    // discovery_cb = disco_cb;
+    out_queue = queue;
     //register the  callback function to the gap module
     esp_err_t ret = esp_ble_gap_register_callback(esp_gap_cb);
     if (ret){
@@ -472,6 +338,42 @@ int init_gatt_client(gattc_discovery_cb_t disco_cb, void *cb_arg){
     return 0;
 }
 
+void set_addr(const uint8_t *addr) {
+    /* Guardar la dirección del nodo hijo */
+    memcpy(child_addr, addr, MAC_ADDR_LEN);
+    ESP_LOG_BUFFER_HEX(GATTC_TAG, child_addr, MAC_ADDR_LEN);
+}
+
+/* Llamar antes de nodo_ble_start */
+int set_chars(const uint16_t *chars, uint8_t chars_len) {
+    /* Crear arreglo de estructuras */
+    if (server_chars.chars == 0 || server_chars.chars == NULL) {
+        gattc_char_t *tmp = calloc(chars_len, sizeof(gattc_char_t)); 
+        server_chars.chars = tmp;
+    } else {
+        if ( ( server_chars.chars = realloc(server_chars.chars, chars_len ) ) == NULL ) {
+            ESP_LOGE(GATTC_TAG, "%s| Error realojando client_chars.chars!", __func__);
+            return -1;
+        }
+    }
+    for(uint8_t i = 0; i < chars_len; i++) {
+        server_chars.chars->uuid.len = ESP_UUID_LEN_16;
+        server_chars.chars->uuid.uuid.uuid16 = chars[i];
+    }
+    server_chars.len = chars_len;
+    return 0;
+}
+
+/* Llamar una vez que se ha llamado a la función set_params */
+void nodo_gattc_start(void) {
+    if ( !client_init_ok ) {
+        ESP_LOGE(GATTC_TAG, "%s| Cliente no inicializado!", __func__);
+        return -1;
+    }
+    esp_ble_gap_start_scanning(GATTC_SCAN_TIMEOUT);
+    return 0;
+}
+
 const char *nodo_gattc_event_to_name(nodo_gattc_events_t evt) {
     switch (evt) {
         case DISCOVERY_CMPL: 
@@ -479,4 +381,40 @@ const char *nodo_gattc_event_to_name(nodo_gattc_events_t evt) {
             break;
     }
     return NULL;
+}
+
+uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
+    return len >= 2 ? ( ( ( 0L | bytes[1] ) << 8 ) | bytes[0] ) : 0;
+}
+
+int gattc_submit_chars(void) {
+    if ( server_chars.len == 1 
+            && server_chars.chars[0].uuid.uuid.uuid16 == TEST_DISCOVERY_UUID ) {
+        // Enviar mensaje DISCOVERY_CMPL
+        return 0;
+    } 
+    if ( server_chars.len > meas_vec.len ) {
+        ESP_LOGE(GATTC_TAG, "%s| Error - chars > vector de mediciones!", __func__);
+        return -1;
+    }
+    for(uint8_t i = 0; i < server_chars.len ; i++) {
+        switch( server_chars.chars[i].uuid.uuid.uuid16 ) {
+            case TEMP_CHAR_UUID:
+                measure_data[i].type = TEMPERATURE;
+                break;
+            case HUMIDITY_CHAR_UUID:
+                measure_data[i].type = HUMIDITY;
+                break;
+            case LUX_CHAR_UUID:
+                measure_data[i].type = LIGHT;
+                break;
+            default:
+                ESP_LOGE(GATTC_TAG, "%s| UUID no encontrada!", __func__);
+                continue;
+        }
+        measure_data[i].value = server_chars.chars[i].value;
+    }
+    ESP_LOGI(GATTC_TAG, "Enviando datos...");
+    //xQueueSendToBack(arg->out_queue, &ws_msg, portMAX_DELAY);
+    // TODO: Cerrar conexión
 }
