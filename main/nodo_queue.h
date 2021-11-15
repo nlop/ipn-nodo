@@ -86,6 +86,7 @@ typedef struct measure_t {
 typedef struct measure_vector_t {
     uint8_t len;
     struct measure_t *data;
+    const char *dev_addr;
 } measure_vector_t;
 
 

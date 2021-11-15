@@ -37,9 +37,11 @@ QueueHandle_t out_queue;
 static gattc_char_vec_t server_chars = { .chars = NULL, .len = 0 };
 /* Variables para measure_vector */
 static measure_t measure_data[3];
-static measure_vector_t meas_vec = {.data = measure_data, .len = 3};
+static measure_vector_t meas_vec = {.data = measure_data, .len = 3, .dev_addr = "GATTS_NODE_ADDR" };
 /* Contenedor para mensajes al ws */
 static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR, .meas_vector = &meas_vec };
+
+/* TODO: reducir LOGIs del módulo */
 
 
 /* One gatt-based profile one app_id and one gattc_if, this array will store the gattc_if returned by ESP_GATTS_REG_EVT */
@@ -133,6 +135,7 @@ void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc
             for( uint8_t i = 0; i < server_chars.len; i++) {
                 //char_elem_result = (esp_gattc_char_elem_t *)malloc(sizeof(esp_gattc_char_elem_t) * count);
                 if ( server_chars.chars[i].handle == 0 ) {
+                    ESP_LOGI(GATTC_TAG, "%s| Looking for char by UUID: 0x%02x", __func__, server_chars.chars[i].uuid.uuid.uuid16);
                     esp_gatt_status_t status = esp_ble_gattc_get_char_by_uuid(gattc_if,
                                                              p_data->search_cmpl.conn_id,
                                                              gl_profile_tab[NODO_PROFILE_ID].service_start_handle,
@@ -142,6 +145,8 @@ void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc
                                                              &count);
                     if (status != ESP_GATT_OK){
                         ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_char_by_uuid error");
+                        esp_ble_gattc_close(gattc_if, p_data->search_cmpl.conn_id);
+                        return;
                     } else {
                         server_chars.chars[i].handle = char_elem_result.char_handle;
                     }
@@ -197,11 +202,13 @@ void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc
             if ( server_chars.chars[i].handle == p_data->read.handle && p_data->read.value != NULL ) {
                 server_chars.chars[i].value = u16_from_bytes(p_data->read.value, p_data->read.value_len);
                 read_chars += 1;
+                ESP_LOGI(GATTC_TAG, "Read ok, handle = 0x%02x", p_data->read.handle);
             }
-            /* Verificar si ya se leyeron todas las propiedades */
-            if ( read_chars == server_chars.len ) {
-
-            }
+        }
+        /* Verificar si ya se leyeron todas las propiedades */
+        if ( read_chars == server_chars.len && read_chars != 0 ) {
+            gattc_submit_chars();
+            read_chars = 0;
         }
         break;
     default:
@@ -239,10 +246,12 @@ void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
             /* ¿La dirección del disp. detectado es la del que buscamos? */
             if (memcmp( scan_result->scan_rst.bda, child_addr, 6) == 0) {
                 ESP_LOGI(GATTC_TAG, "Dispositivo encontrado!");
-                esp_ble_gap_stop_scanning();
-                esp_ble_gattc_open(gl_profile_tab[NODO_PROFILE_ID].gattc_if, scan_result->scan_rst.bda, scan_result->scan_rst.ble_addr_type, true);
+                if (connect == false) {
+                    connect = true;
+                    esp_ble_gap_stop_scanning();
+                    esp_ble_gattc_open(gl_profile_tab[NODO_PROFILE_ID].gattc_if, scan_result->scan_rst.bda, scan_result->scan_rst.ble_addr_type, true);
+                }
             }
-            ESP_LOGI(GATTC_TAG, "\n");
             break;
         case ESP_GAP_SEARCH_INQ_CMPL_EVT:
             break;
@@ -310,7 +319,8 @@ void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_ga
     } while (0);
 }
 
-int init_gatt_client(gattc_discovery_cb_t disco_cb, const QueueHandle_t queue){
+//int init_gatt_client(gattc_discovery_cb_t disco_cb, const QueueHandle_t queue){
+int init_gatt_client(const QueueHandle_t queue){
     // discovery_cb = disco_cb;
     out_queue = queue;
     //register the  callback function to the gap module
@@ -338,14 +348,16 @@ int init_gatt_client(gattc_discovery_cb_t disco_cb, const QueueHandle_t queue){
     return 0;
 }
 
-void set_addr(const uint8_t *addr) {
+void gattc_set_addr(const uint8_t *addr) {
     /* Guardar la dirección del nodo hijo */
     memcpy(child_addr, addr, MAC_ADDR_LEN);
+    ESP_LOGI(GATTC_TAG, "%s| Declarando dirección...", __func__);
     ESP_LOG_BUFFER_HEX(GATTC_TAG, child_addr, MAC_ADDR_LEN);
 }
 
 /* Llamar antes de nodo_ble_start */
-int set_chars(const uint16_t *chars, uint8_t chars_len) {
+int gattc_set_chars(const uint16_t *chars, uint8_t chars_len) {
+    ESP_LOGI(GATTC_TAG, "%s| Declarando caraterísticas...", __func__);
     /* Crear arreglo de estructuras */
     if (server_chars.chars == 0 || server_chars.chars == NULL) {
         gattc_char_t *tmp = calloc(chars_len, sizeof(gattc_char_t)); 
@@ -357,19 +369,20 @@ int set_chars(const uint16_t *chars, uint8_t chars_len) {
         }
     }
     for(uint8_t i = 0; i < chars_len; i++) {
-        server_chars.chars->uuid.len = ESP_UUID_LEN_16;
-        server_chars.chars->uuid.uuid.uuid16 = chars[i];
+        server_chars.chars[i].uuid.len = ESP_UUID_LEN_16;
+        server_chars.chars[i].uuid.uuid.uuid16 = chars[i];
     }
     server_chars.len = chars_len;
     return 0;
 }
 
 /* Llamar una vez que se ha llamado a la función set_params */
-void nodo_gattc_start(void) {
+int nodo_gattc_start(void) {
     if ( !client_init_ok ) {
         ESP_LOGE(GATTC_TAG, "%s| Cliente no inicializado!", __func__);
         return -1;
     }
+    ESP_LOGI(GATTC_TAG, "%s| Start scanning!", __func__);
     esp_ble_gap_start_scanning(GATTC_SCAN_TIMEOUT);
     return 0;
 }
@@ -383,11 +396,13 @@ const char *nodo_gattc_event_to_name(nodo_gattc_events_t evt) {
     return NULL;
 }
 
+/* Convertir los primeros dos bytes de un arreglo entero s/signo de 16b */
 uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
     return len >= 2 ? ( ( ( 0L | bytes[1] ) << 8 ) | bytes[0] ) : 0;
 }
 
 int gattc_submit_chars(void) {
+    ESP_LOGW(GATTC_TAG, "%s| Submit chars!", __func__); 
     if ( server_chars.len == 1 
             && server_chars.chars[0].uuid.uuid.uuid16 == TEST_DISCOVERY_UUID ) {
         // Enviar mensaje DISCOVERY_CMPL
@@ -415,6 +430,8 @@ int gattc_submit_chars(void) {
         measure_data[i].value = server_chars.chars[i].value;
     }
     ESP_LOGI(GATTC_TAG, "Enviando datos...");
-    //xQueueSendToBack(arg->out_queue, &ws_msg, portMAX_DELAY);
+    xQueueSendToBack(out_queue, &ws_msg, portMAX_DELAY);
     // TODO: Cerrar conexión
+    esp_ble_gattc_close(gl_profile_tab[NODO_PROFILE_ID].gattc_if, gl_profile_tab[NODO_PROFILE_ID].conn_id);
+    return 0;
 }

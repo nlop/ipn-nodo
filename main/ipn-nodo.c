@@ -23,6 +23,10 @@ void start_notify_connected_cb(EventGroupHandle_t evt_group, bool connected);
 void sync_time();
 int load_gattc_db(void);
 
+/* temp */
+const static uint16_t chars[3] = { TEMP_CHAR_UUID, HUMIDITY_CHAR_UUID, LUX_CHAR_UUID};
+const static uint8_t child_addr [] = {0xec, 0x94, 0xcb, 0x4d, 0xac, 0x76};
+
 /** Variables globales **/
 db_entries_t gattc_db = {0};
 
@@ -108,7 +112,8 @@ void app_main(void) {
  *      del nodo
  */
 int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
-    QueueHandle_t queue_out;
+    QueueHandle_t queue_out = 0;
+    //QueueHandle_t queue_out;
     TaskHandle_t ws_task_handle, meas_task_handle;
     BaseType_t ret;
     if (dev_type == NODO_WIFI || dev_type == SINKNODE) {
@@ -140,6 +145,30 @@ int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
             if ( load_gattc_db() != 0 ) {
                 ESP_LOGE(MAIN_TAG, "%s| Error cargando GATTC DB!", __func__);
             }
+            /* temp: Arrancar stack BT */ 
+            if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
+                ESP_LOGE(MAIN_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
+                return -1;
+            }
+            if (init_gatt_client(queue_out) != 0) {
+                ESP_LOGE(MAIN_TAG, "%s: Error levantando cliente GATT!", __func__); 
+                return -1;
+            }
+            gattc_set_addr(child_addr);
+            if ( gattc_set_chars(chars, sizeof(chars)/sizeof(chars[0])) != 0) {
+                ESP_LOGE(MAIN_TAG, "%s: Error declarando chars!", __func__); 
+                return -1; 
+            }
+            /*
+             * TODO:
+             *  + Arrancar BLE
+             *  + Arrancar GATTC peero:
+             *      * Correr la rutina hasta la búsqueda
+             *      * Utilizar callbacks para rastrear el avance del proceso de
+             *      inicio
+             *      * Separar la funcionalidad del código actual para trabajar
+             *      en los casos de inicialización y monitoreo normal
+             */
         }
     } else {
         ESP_LOGD(MAIN_TAG, "Arrancado task GATT...");

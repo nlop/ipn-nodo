@@ -8,7 +8,7 @@ uint8_t response_len = 0;
 /** Funciones locales **/
 static void ws_evt_handler_conn(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
-cJSON *get_measure_vector_json(measure_vector_t *mvector, const char *dev_addr);
+cJSON *get_measure_vector_json(measure_vector_t *mvector);
 int json_wrap_message_buff(enum json_msg_status_t , enum json_msg_type_t ,  cJSON *, char *, size_t);
 char *get_timestamp();
 void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue);
@@ -163,7 +163,7 @@ void websocket_task(void *pvParameters) {
         if (msg.type == MSG_MEAS_VECTOR) {
             ESP_LOGI(WSTASK_TAG, "MSG_MEAS_VECTOR");
             // TODO: Manejar error donde buffer no puede almacenar JSON
-            cJSON *mvector_json = get_measure_vector_json(msg.meas_vector, nodo_get_mac()); //(char *) &buffer, JSON_BUFFER_SIZE);
+            cJSON *mvector_json = get_measure_vector_json(msg.meas_vector); //(char *) &buffer, JSON_BUFFER_SIZE);
             json_wrap_message_buff(STATUS_OK, LIVE_DATA, mvector_json, buffer, JSON_BUFFER_SIZE );
             ESP_LOGI(WSTASK_TAG, "Enviando mensaje al servidor...");
             ESP_LOGI(WSTASK_TAG, "JSON:\n%s", buffer);
@@ -268,15 +268,16 @@ void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
         arg->server_addr = addr;
         /* Habilitar el stack BT/BLE sí no esta habilitado */
         if (dev_type == NODO_WIFI) {
-            ESP_LOGI(WSTASK_TAG, "%s: Habilitando stack BT/BLE...", __func__);
-            if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
-                ESP_LOGE(WSTASK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
-                return;
-            }
-            if (init_gatt_client(gattc_ws_callback, arg) != 0) {
-                ESP_LOGE(WSTASK_TAG, "%s: Error levantando cliente GATT!", __func__); 
-                return;
-            }
+            ESP_LOGI(WSTASK_TAG, "%s| Debería habilitar BT/BLE & iniciar GATTC...", __func__);
+            //ESP_LOGI(WSTASK_TAG, "%s: Habilitando stack BT/BLE...", __func__);
+            //if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
+            //    ESP_LOGE(WSTASK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
+            //    return;
+            //}
+            //if (init_gatt_client(gattc_ws_callback, arg) != 0) {
+            //    ESP_LOGE(WSTASK_TAG, "%s: Error levantando cliente GATT!", __func__); 
+            //    return;
+            //}
         }
         ESP_LOGI(WSTASK_TAG, "%s| Done!", __func__);
         // Discovery...
@@ -319,9 +320,8 @@ void gattc_ws_callback(nodo_gattc_events_t evt, void *cb_arg) {
 
 
 /*
- * Convertir un vector de mediciones (measure_vector_t) en un objeto JSON
+ * Encapsular el contenido 'content' de un mensaje en un objeto JSON
  */
-
 int json_wrap_message_buff(enum json_msg_status_t status, enum json_msg_type_t type,  cJSON *content, char *buffer, size_t buffer_len) {
     cJSON *json_msg = cJSON_CreateObject();
     cJSON *status_val = cJSON_CreateString(json_get_status_str(status));
@@ -338,14 +338,14 @@ int json_wrap_message_buff(enum json_msg_status_t status, enum json_msg_type_t t
     return 0;
 }
 
-cJSON *get_measure_vector_json(measure_vector_t *mvector, const char *dev_addr) {
+cJSON *get_measure_vector_json(measure_vector_t *mvector) {
     char *timestamp;
     // Crear cadena JSON
     cJSON *json_obj = cJSON_CreateObject();
     timestamp = get_timestamp();
     cJSON *timestamp_val = cJSON_CreateString(timestamp);
     cJSON_AddItemToObject(json_obj, "timestamp", timestamp_val);
-    cJSON *dev_addr_val = cJSON_CreateString(dev_addr);
+    cJSON *dev_addr_val = cJSON_CreateString(mvector->dev_addr);
     cJSON_AddItemToObject(json_obj, "devAddr", dev_addr_val);
     cJSON *meas_array = cJSON_CreateArray();
     cJSON_AddItemToObject(json_obj, "measurements", meas_array);

@@ -9,8 +9,11 @@
 #include "freertos/queue.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
+#include "nodo_def.h"
 #include "nodo_events.h"
 #include "nodo_queue.h"
+#include "nodo_gattc.h"
+#include "nodo_mac.h"
 
 #if CONFIG_TSL2561_ENABLED 
 #include <tsl2561.h>
@@ -20,6 +23,7 @@
 #define MEASURE_RATE_MS     CONFIG_MEASURE_RATE_MS
 #define SAMPLES             CONFIG_SAMPLES
 #define DEFAULT_VREF        CONFIG_VREF
+#define MAX_GATTC_ATTEMPTS  15
 
 #if CONFIG_TSL2561_ENABLED 
 // TSL2561
@@ -40,5 +44,6 @@ typedef struct meas_task_arg_t {
 void measure_task(void *pvParameters);
 char *get_measure_str(uint8_t type);
 
+extern dev_type_t dev_type;
 
 #endif 

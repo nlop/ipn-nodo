@@ -43,10 +43,11 @@ void measure_task(void *pvParameters) {
     ESP_LOGI(MEAS_TAG, "Esperando a HTTP_OK, GATT_TASK_OK (COMM_DISPATCHER_OK) ...");
     xEventGroupWaitBits(arg->nodo_evt_group, COMM_DISPATCHER_OK, pdFALSE, pdFALSE, portMAX_DELAY);
     ESP_LOGI(MEAS_TAG, "Empezando a medir!");
-    ws_queue_msg_t ws_msg = {0};
-    measure_vector_t mvector = {0};
-    mvector.len = 3; 
-    mvector.data = (measure_t *) calloc(mvector.len, sizeof(measure_t));
+    static measure_t mvector_data[3];
+    static measure_vector_t mvector = { .len = 3, .data = mvector_data };
+    mvector.dev_addr = nodo_get_mac();
+    static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR, .meas_vector = &mvector };
+    //mvector.data = (measure_t *) calloc(mvector.len, sizeof(measure_t));
     ws_msg.type = MSG_MEAS_VECTOR;
     ws_msg.meas_vector = &mvector;
     for(;;) {
@@ -57,8 +58,10 @@ void measure_task(void *pvParameters) {
         }
         adc_value /= SAMPLES;
         lm35_vol = esp_adc_cal_raw_to_voltage(adc_value, adc1_ch6_chars);
-        mvector.data[0].type = TEMPERATURE;
-        mvector.data[0].value = lm35_vol;
+        //mvector.data[0].type = TEMPERATURE;
+        //mvector.data[0].value = lm35_vol;
+        mvector_data[0].type = TEMPERATURE;
+        mvector_data[0].value = lm35_vol;
         ESP_LOGI(MEAS_TAG, " LM35 => RAW = %d, mV = %d", adc_value, lm35_vol);
         // 2do Canal - Humedad
         adc_value = 0;
@@ -68,23 +71,34 @@ void measure_task(void *pvParameters) {
         adc_value /= SAMPLES;
         hum_vol = esp_adc_cal_raw_to_voltage(adc_value, adc1_ch7_chars);
         ESP_LOGI(MEAS_TAG, " Humedad => RAW = %d, mV = %d", adc_value, hum_vol);
-        mvector.data[1].type = HUMIDITY;
-        mvector.data[1].value = hum_vol;
+        mvector_data[1].type = HUMIDITY;
+        mvector_data[1].value = hum_vol;
 #if CONFIG_TSL2561_ENABLED 
         // TSL2561
         if ((res = tsl2561_read_lux(&dev, &lux)) != ESP_OK)
             ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
         else
             ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
-        mvector.data[2].type = LIGHT;
-        mvector.data[2].value = lux;
+        mvector_data[2].type = LIGHT;
+        mvector_data[2].value = lux;
 #else
-        mvector.data[2].type = LIGHT;
-        mvector.data[2].value = 0;
+        mvector_data[2].type = LIGHT;
+        mvector_data[2].value = 0;
 #endif
-        ESP_LOGI(MEAS_TAG, "Enviando datos...");
         xQueueSendToBack(arg->out_queue, &ws_msg, portMAX_DELAY);
         ESP_LOGI(MEAS_TAG, "Datos enviados!");
+        if ( dev_type == SINKNODE ) {
+            ESP_LOGW(MEAS_TAG, "%s| Enviado datos de nodos...", __func__);
+            // TODO: for dev : gattc_db { ... } 
+            for ( uint8_t i = 0; i < MAX_GATTC_ATTEMPTS; i++ ) {
+                int ret = nodo_gattc_start();
+                if ( ret != 0 ) {
+                    ESP_LOGE(MEAS_TAG, "%s GATTC reintento #%02d", __func__, i);
+                } else {
+                    break;
+                }
+            }
+        }
         vTaskDelay(pdMS_TO_TICKS(MEASURE_RATE_MS));
     }
     vTaskDelete(NULL);

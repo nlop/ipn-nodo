@@ -29,7 +29,9 @@ const char *nodo_get_mac() {
 void get_mac_str(uint8_t *src, char *dest) {
     char tmp[8];
     for(uint8_t i = 0; i < MAC_BYTES; i++) {
-        sprintf((char *) &tmp, "%02hX:", src[i]);
-        memcpy(dest + i*3, &tmp, 3 * sizeof(uint8_t));
+        sprintf((char *) &tmp, "%02hx:", src[i]);
+        memcpy(dest + i * 3, &tmp, 3 * sizeof(uint8_t));
     }
+    /* Eliminar los dos puntos ':' del último bloque*/
+    dest[MAC_BYTES * 3 - 1] = '\0';
 }
