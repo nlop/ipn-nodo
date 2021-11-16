@@ -17,7 +17,7 @@
 #include "nodo_queue.h"
 
 #define GATTS_TAG                   "BLE_GATTS"
-#define GATT_TASK_TAG               "GATTS TASK"
+#define GATT_TASK_TAG               "GATTS_TASK"
 #define GATTS_APP_ID                0x91                // ID escogido arbitrariamente
 #define PROFILE_NUM                 1
 #define NODO_SERVICE_ID             0
@@ -46,6 +46,7 @@ static const uint16_t temperature_uuid = 0x2A6E;        // SIG GATT Characterist
 static const uint16_t humidity_uuid= 0x2A6F; 
 static const uint16_t lux_uuid = 0x2AFB;
 static const uint16_t generic_uuid = 0x2AF9;
+static const uint16_t system_id_uuid = 0x2a23;
 /* Characteristics formats (<<< LSB ----- MSB >>>) */
 static const uint8_t temp_presentation_format[7] =  {0x10, -1, 0x2f, 0x27, 0x01, 0x00, 0x00};
 static const uint8_t hum_presentation_format[7] =   {0x10, -3, 0x28, 0x27, 0x01, 0x00, 0x00};
@@ -57,10 +58,13 @@ static const uint16_t char_pres_fmt_uuid = ESP_GATT_UUID_CHAR_PRESENT_FORMAT;
 static const uint8_t char_properties_rn = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 /* Characteristics values */
 static const int32_t init_value = 0;
+static const int32_t default_system_id = 0xFF01;
 
 /* Enum de atributos para el perfil */
 enum {
     ID_SVC, 
+    ID_INSTANCE_ID,
+    ID_INSTANCE_ID_VAL,
     ID_CHAR_TEMP,
     ID_CHAR_TEMP_VAL,
     ID_CHAR_TEMP_FMT,
@@ -85,6 +89,26 @@ static const esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
                 MAX_SERVICE_UUID_LEN,                   // Long. Max. entrada
                 MAX_SERVICE_UUID_LEN,                   // Long. entrada
                 (uint8_t *) service_uuid                // Valor entrada
+            }},
+    [ID_INSTANCE_ID] =
+        {{ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16,
+                (uint8_t *) &char_declaration_uuid, 
+                ESP_GATT_PERM_READ,
+                CHAR_DECLARATION_SIZE,
+                CHAR_DECLARATION_SIZE,
+                (uint8_t *) &char_properties_rn 
+            }},
+    [ID_INSTANCE_ID_VAL] =
+        {{ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16,
+                (uint8_t *) &system_id_uuid, 
+                ESP_GATT_PERM_READ,
+                sizeof(int32_t),
+                sizeof(int32_t),
+                (uint8_t *) &default_system_id 
             }},
     [ID_CHAR_TEMP] =
         {{ESP_GATT_AUTO_RSP},

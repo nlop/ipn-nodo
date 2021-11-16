@@ -15,6 +15,9 @@ void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue);
 cJSON *get_generic_msg_json(esp_err_t esp_status, uint8_t status);
 
 extern dev_type_t dev_type;
+extern spiffs_db_t gattc_db;
+
+//const static uint16_t chars[3] = { TEMP_CHAR_UUID, HUMIDITY_CHAR_UUID, LUX_CHAR_UUID};
 
 /*
  * Configuración del cliente HTTP para enviar el token
@@ -123,6 +126,9 @@ esp_err_t nodo_http_init_handler(esp_http_client_event_t *evt)
     }
     return ESP_OK;
 }
+
+/* GATTC Init */
+static uint16_t const init_char[] = { TEST_DISCOVERY_UUID };
 
 void websocket_task(void *pvParameters) {
     ws_queue_msg_t msg = {0};
@@ -257,27 +263,43 @@ void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
     if ( strcmp(msg_type->valuestring, "esp-dev-discovery") == 0 ) {
         uint8_t *addr;
         /* Preparar el argumento para el callback */
-        gattc_ws_init_arg_t *arg = (gattc_ws_init_arg_t *) calloc(1, sizeof(gattc_ws_init_arg_t));
-        arg->ws_queue = *ws_queue;
         cJSON *child = cJSON_GetObjectItem(content, "child");
 
         if ( ( addr = parse_u8_array(child, ENTRY_LEN) ) == NULL ) {
             return;
         }
         ESP_LOG_BUFFER_HEX(WSTASK_TAG, addr, ENTRY_LEN);
-        arg->server_addr = addr;
         /* Habilitar el stack BT/BLE sí no esta habilitado */
         if (dev_type == NODO_WIFI) {
-            ESP_LOGI(WSTASK_TAG, "%s| Debería habilitar BT/BLE & iniciar GATTC...", __func__);
-            //ESP_LOGI(WSTASK_TAG, "%s: Habilitando stack BT/BLE...", __func__);
-            //if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
-            //    ESP_LOGE(WSTASK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
-            //    return;
-            //}
-            //if (init_gatt_client(gattc_ws_callback, arg) != 0) {
-            //    ESP_LOGE(WSTASK_TAG, "%s: Error levantando cliente GATT!", __func__); 
-            //    return;
-            //}
+            //ESP_LOGI(WSTASK_TAG, "%s| Debería habilitar BT/BLE & iniciar GATTC...", __func__);
+            ESP_LOGI(WSTASK_TAG, "%s: Habilitando stack BT/BLE...", __func__);
+            if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
+                ESP_LOGE(WSTASK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
+                return;
+            }
+            if (init_gatt_client(*ws_queue) != 0) {
+                ESP_LOGE(WSTASK_TAG, "%s: Error levantando cliente GATT!", __func__); 
+                return;
+            }
+            register_discovery_cb(gattc_ws_callback);
+            // TODO: Agregar str_addr para DISCOVERY_CMPL/FAIL
+            char *addr_str = (char *) calloc(MAC_STR_LEN + 1, sizeof(char));
+            get_mac_str(addr, addr_str);
+            gattc_set_addr(addr, addr_str);
+            if ( gattc_set_chars(init_char, sizeof(init_char)/sizeof(init_char[0])) != 0) {
+                ESP_LOGE(WSTASK_TAG, "%s: Error declarando chars!", __func__); 
+                return; 
+            }
+            for ( uint8_t i = 0; i < MAX_GATTC_ATTEMPTS; i++ ) {
+                int ret = nodo_gattc_start();
+                if ( ret != 0 ) {
+                    ESP_LOGE(MEAS_TAG, "%s GATTC reintento #%02d", __func__, i);
+                    vTaskDelay(pdMS_TO_TICKS(GATTC_WAIT_START_TIMEOUT));
+                } else {
+                    break;
+                }
+            }
+            free(addr_str);
         }
         ESP_LOGI(WSTASK_TAG, "%s| Done!", __func__);
         // Discovery...
@@ -287,14 +309,10 @@ void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
 }
 
 /* Callback enviado al proceso de inicialización de BLE */
-void gattc_ws_callback(nodo_gattc_events_t evt, void *cb_arg) {
-    gattc_ws_init_arg_t *arg = (gattc_ws_init_arg_t *) cb_arg;
-    if ( evt == DISCOVERY_CMPL) {
-        ws_queue_msg_t msg = {
-            .type = MSG_STATUS_GENERIC,
-            .status = { .esp_status = ESP_OK, .status = DISCOVERY_CMPL, }
-        };
-        xQueueSendToBack(arg->ws_queue, &msg, portMAX_DELAY);
+void gattc_ws_callback(nodo_gattc_events_t evt, void *arg) {
+    /* TODO: Emitir mensaje donde falla el proceso de descubrimiento
+     * |-> Parcialmente cubierto en nodo_gattc.h! */
+    if ( evt == DISCOVERY_CMPL ) {
         /* Guardar en SPIFFS */
         if ( ( dev_type == NODO_WIFI ) &&  ( spiffs_init() != 0 ) ) {
             ESP_LOGE(WSTASK_TAG, "%s| Error inicializando almacenamiento SPIFFS!", __func__);
@@ -304,17 +322,44 @@ void gattc_ws_callback(nodo_gattc_events_t evt, void *cb_arg) {
             ESP_LOGE(WSTASK_TAG, "%s| Error montando SPIFFS!", __func__);
             return;
         }
-        if (spiffs_add_entry(arg->server_addr) != 0 ) {
+        /* TODO: enviar un puntero desde _gattc a los bytes de la dirección MAC */
+        if (spiffs_add_entry( (uint8_t *) arg ) != 0 ) {
             ESP_LOGE(WSTASK_TAG, "%s| Error guardando entrada!", __func__);
             return;
         }
-        if ( nvs_set_mode(SINKNODE) != 0 ) {
-            ESP_LOGE(WSTASK_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
+        if ( ( dev_type == NODO_WIFI ) && ( nvs_set_mode(SINKNODE) != 0 ) ) {
+                ESP_LOGE(WSTASK_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
         }
-        free(arg->server_addr);
-        free(arg);
         spiffs_umount();
-        ESP_LOGI(WSTASK_TAG, "SINKNODE init done!");
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        /* Reiniciar para inicializar con nuevo modo o leer de nuevo la lista y
+         * realizar la primera lectura */
+        esp_restart();
+        /* Ruta alternativa sin reinicio <<< Genera errores de ejecución >>> */
+        //gattc_db.len += 1;
+        //db_entry_t *ret = reallocarray(gattc_db.data, gattc_db.len, sizeof(db_entry_t));
+        //if ( ret == NULL )
+        //    ESP_LOGE(WSTASK_TAG, "%s| Error modificando gattc_db!", __func__);
+        //else
+        //    gattc_db.data = ret;
+        ///* Rellenar datos de la última estación agregada */
+        //uint8_t *tmp = (uint8_t *) calloc(MAC_BYTES, sizeof(uint8_t));
+        //if ( tmp != NULL ) {
+        //    memcpy(tmp, arg, MAC_BYTES);
+        //} else {
+        //    ESP_LOGE(WSTASK_TAG, "%s| Error alojando memoria para raw_addr!", __func__);
+        //    return;
+        //}
+        //gattc_db.data[gattc_db.len - 1].raw_addr = tmp;
+        //char *tmp_str = (char *) calloc(MAC_STR_LEN + 1, sizeof(char));
+        //get_mac_str(gattc_db.data[gattc_db.len - 1].raw_addr, tmp_str);
+        //gattc_db.data[gattc_db.len - 1].str_addr = tmp_str;
+        ///* Establecer los parámetros de lectura para GATTC */
+        //if ( gattc_set_chars(chars, sizeof(chars)/sizeof(chars[0])) != 0) {
+        //    ESP_LOGE(WSTASK_TAG, "%s: Error declarando chars!", __func__); 
+        //    return; 
+        //}
+        unregister_discovery_cb();
     }
 }
 

@@ -14,6 +14,7 @@
 #include "nodo_queue.h"
 #include "nodo_gattc.h"
 #include "nodo_mac.h"
+#include "nodo_spiffs.h"
 
 #if CONFIG_TSL2561_ENABLED 
 #include <tsl2561.h>
@@ -38,6 +39,7 @@ typedef struct meas_task_arg_t {
     QueueHandle_t out_queue;            // Cola para recibir paquetes enviados por otros tasks
     EventGroupHandle_t nodo_evt_group;  // Handle al event group de todo el nodo. Usado para
                                         // esperar al evento HTTP_OK
+    spiffs_db_t *gattc_db;
 } meas_task_arg_t;
 
 /** Funciones **/

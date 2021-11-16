@@ -183,11 +183,11 @@ int spiffs_delete_entry(uint8_t index) {
  *      puntero a los arreglos es NULL.
  *
  */
-int spiffs_get_all(db_entries_t *ret) {
+int spiffs_get_all(spiffs_db_t *ret) {
     ESP_LOGI(SPIFFS_TAG, "%s", __func__);
     FILE *gattc_db = fopen(GATTC_DB_PATH, "r");
     uint8_t num_entries = 0;
-    uint8_t **entries;
+    db_entry_t *entries;
     if (gattc_db == NULL) {
         ESP_LOGE(SPIFFS_TAG, "%s: Error abriendo archivo %s!", __func__, GATTC_DB_PATH);
         return -1;
@@ -204,7 +204,7 @@ int spiffs_get_all(db_entries_t *ret) {
         return -1;
     }
     ESP_LOGI(SPIFFS_TAG, "#entradas = %02d", num_entries);
-    if ( (entries = (uint8_t **) calloc(num_entries, sizeof(uint8_t *))) == NULL) {
+    if ( (entries = (db_entry_t *) calloc(num_entries, sizeof(db_entry_t))) == NULL) {
         ESP_LOGE(SPIFFS_TAG, "%s| Error asignando memoria!", __func__);
         return -1;
     }
@@ -214,12 +214,12 @@ int spiffs_get_all(db_entries_t *ret) {
         if ( (entry_tmp = (uint8_t *) calloc(ENTRY_LEN, sizeof(uint8_t))) == NULL ) {
             ESP_LOGE(SPIFFS_TAG, "%s| Error asignando memoria!", __func__);
             /* Liberar la memoria asignada antes del error */
-            for(i -= 1; i > 0; --i, free(entries[i]));
+            for(i -= 1; i > 0; --i, free(entries[i].raw_addr));
             free(entries);
             return -1;
         } else {
             fread(entry_tmp, sizeof(uint8_t), ENTRY_LEN, gattc_db);
-            entries[i] = entry_tmp;
+            entries[i].raw_addr = entry_tmp;
         }
     }
     fclose(gattc_db);
@@ -238,9 +238,16 @@ int spiffs_get_all(db_entries_t *ret) {
  *      entries : Estructura de datos que contiene los punteros que serán
  *      liberados.
  */
-void db_entries_free(db_entries_t entries) {
+void db_entries_free(spiffs_db_t entries) {
     ESP_LOGI(SPIFFS_TAG, "%s", __func__);
-    for(uint8_t i = 0; i < entries.len; free(entries.data[i]), i++);
+    for(uint8_t i = 0; i < entries.len;  i++) {
+        if ( entries.data[i].raw_addr != NULL ) 
+            free(entries.data[i].raw_addr);
+    }
+    for(uint8_t i = 0; i < entries.len;  i++) {
+        if ( entries.data[i].str_addr != NULL ) 
+            free(entries.data[i].str_addr);
+    }
     free(entries.data);
 }
 

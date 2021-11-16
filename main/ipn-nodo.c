@@ -25,12 +25,14 @@ int load_gattc_db(void);
 
 /* temp */
 const static uint16_t chars[3] = { TEMP_CHAR_UUID, HUMIDITY_CHAR_UUID, LUX_CHAR_UUID};
-const static uint8_t child_addr [] = {0xec, 0x94, 0xcb, 0x4d, 0xac, 0x76};
+// const static uint8_t child_addr [] = {0xec, 0x94, 0xcb, 0x4d, 0xac, 0x76};
 
 /** Variables globales **/
-db_entries_t gattc_db = {0};
+spiffs_db_t gattc_db = {0};
 
 dev_type_t dev_type = 0;            /* Tipo de dispositivo que esta corriendo (BLE, WIFI, WIFI + BLE) */
+
+TaskHandle_t ws_task_handle;
 
 void app_main(void) {
     /* TODO:
@@ -83,6 +85,7 @@ void app_main(void) {
             nodo_wifi_init(start_notify_connected_cb, nodo_evt_group);
             nodo_wifi_set_credentials(ssid, psk);
             /* Sincronizar el tiempo con NTP */
+            // TODO: Sincronizar en first boot
             sync_time();
         } else {
             ESP_LOGI(MAIN_TAG, "No se ha configurado!\nInicializando estación: first boot...");
@@ -114,7 +117,7 @@ void app_main(void) {
 int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
     QueueHandle_t queue_out = 0;
     //QueueHandle_t queue_out;
-    TaskHandle_t ws_task_handle, meas_task_handle;
+    TaskHandle_t meas_task_handle;
     BaseType_t ret;
     if (dev_type == NODO_WIFI || dev_type == SINKNODE) {
         ESP_LOGI(MAIN_TAG, "Arrancado task WebSocket...");
@@ -133,7 +136,8 @@ int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
         ret = xTaskCreate(
                 websocket_task,
                 "websocket_task",
-                configMINIMAL_STACK_SIZE * 8,
+                //configMINIMAL_STACK_SIZE * 8,
+                8192,
                 (void *) ws_arg,
                 5,
                 &ws_task_handle);
@@ -154,21 +158,11 @@ int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
                 ESP_LOGE(MAIN_TAG, "%s: Error levantando cliente GATT!", __func__); 
                 return -1;
             }
-            gattc_set_addr(child_addr);
+            //gattc_set_addr(child_addr);
             if ( gattc_set_chars(chars, sizeof(chars)/sizeof(chars[0])) != 0) {
                 ESP_LOGE(MAIN_TAG, "%s: Error declarando chars!", __func__); 
                 return -1; 
             }
-            /*
-             * TODO:
-             *  + Arrancar BLE
-             *  + Arrancar GATTC peero:
-             *      * Correr la rutina hasta la búsqueda
-             *      * Utilizar callbacks para rastrear el avance del proceso de
-             *      inicio
-             *      * Separar la funcionalidad del código actual para trabajar
-             *      en los casos de inicialización y monitoreo normal
-             */
         }
     } else {
         ESP_LOGD(MAIN_TAG, "Arrancado task GATT...");
@@ -179,7 +173,8 @@ int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
         ret = xTaskCreate(
                 gatt_task, 
                 "gatt_task", 
-                configMINIMAL_STACK_SIZE * 4,
+                //configMINIMAL_STACK_SIZE * 4,
+                1024,
                 (void *) gatt_arg,
                 5,
                 &ws_task_handle);
@@ -192,10 +187,12 @@ int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
     meas_task_arg_t *meas_arg = (meas_task_arg_t *) calloc(1, sizeof(meas_task_arg_t));
     meas_arg->nodo_evt_group = evt_group;
     meas_arg->out_queue = queue_out;
+    meas_arg->gattc_db = ( dev_type == SINKNODE ) ? &gattc_db : NULL;
     ret = xTaskCreate(
             measure_task, 
             "measure_task", 
-            configMINIMAL_STACK_SIZE * 6,
+            //configMINIMAL_STACK_SIZE * 6,
+            4096,
             (void *) meas_arg,
             5,
             &meas_task_handle);
@@ -228,9 +225,14 @@ int load_gattc_db(void) {
             ESP_LOGE(MAIN_TAG, "%s| Error leyendo GATTC_DB!", __func__);
             return -1;
         }
+        /* Generar Strings de dirección MAC */
         for ( uint8_t i = 0; i < gattc_db.len; i++) {
             ESP_LOGI(MAIN_TAG, "DEV #%d", i);
-            ESP_LOG_BUFFER_HEX(MAIN_TAG, gattc_db.data[i], ENTRY_LEN);
+            char *tmp = ( char * ) calloc(MAC_STR_LEN + 1, sizeof(char));
+            get_mac_str(gattc_db.data[i].raw_addr, tmp);
+            gattc_db.data[i].str_addr = tmp;
+            ESP_LOGI(MAIN_TAG, "%s", gattc_db.data[i].str_addr);
+            //ESP_LOG_BUFFER_HEX(MAIN_TAG, gattc_db.data[i], ENTRY_LEN);
         }
         spiffs_umount();
     }

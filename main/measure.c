@@ -87,15 +87,19 @@ void measure_task(void *pvParameters) {
 #endif
         xQueueSendToBack(arg->out_queue, &ws_msg, portMAX_DELAY);
         ESP_LOGI(MEAS_TAG, "Datos enviados!");
-        if ( dev_type == SINKNODE ) {
-            ESP_LOGW(MEAS_TAG, "%s| Enviado datos de nodos...", __func__);
-            // TODO: for dev : gattc_db { ... } 
-            for ( uint8_t i = 0; i < MAX_GATTC_ATTEMPTS; i++ ) {
-                int ret = nodo_gattc_start();
-                if ( ret != 0 ) {
-                    ESP_LOGE(MEAS_TAG, "%s GATTC reintento #%02d", __func__, i);
-                } else {
-                    break;
+        if ( ( dev_type == SINKNODE ) && ( arg->gattc_db != NULL ) ) {
+            for(uint8_t i = 0; i < arg->gattc_db->len; i++) {
+                gattc_set_addr(arg->gattc_db->data[i].raw_addr, 
+                        arg->gattc_db->data[i].str_addr);
+                ESP_LOGW(MEAS_TAG, "%s| Enviado datos de nodos...", __func__);
+                for ( uint8_t i = 0; i < MAX_GATTC_ATTEMPTS; i++ ) {
+                    int ret = nodo_gattc_start();
+                    if ( ret != 0 ) { 
+                        ESP_LOGE(MEAS_TAG, "%s GATTC reintento #%02d", __func__, i);
+                        vTaskDelay(pdMS_TO_TICKS(GATTC_WAIT_START_TIMEOUT));
+                    } else {
+                        break;
+                    }
                 }
             }
         }

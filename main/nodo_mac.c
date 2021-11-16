@@ -1,19 +1,18 @@
 #include "nodo_mac.h"
 
 char mac_nodo_str[32];
-uint8_t mac_ready = 0;
-void get_mac_str(uint8_t *src, char *dest);
+static bool mac_ready = false;
 
 /*
  * Obtener el puntero a la cadena que representa la dirección MAC del
  * dispositivo Bluetooth
  */
 const char *nodo_get_mac() {
-    if (mac_ready == 0) {
+    if (mac_ready == false) {
         uint8_t mac_nodo[6];
         ESP_ERROR_CHECK(esp_read_mac( mac_nodo, ESP_MAC_BT));
-        get_mac_str((uint8_t *) mac_nodo, mac_nodo_str);
-        mac_ready = 1;
+        get_mac_str(mac_nodo, mac_nodo_str);
+        mac_ready = true;
     }
     return mac_nodo_str;
 }
@@ -26,7 +25,7 @@ const char *nodo_get_mac() {
  *      src: Puntero donde estan almacenados los bytes de la dirección MAC
  *      dest: Puntero donde se almacenará la cadena creada
  */
-void get_mac_str(uint8_t *src, char *dest) {
+void get_mac_str(const uint8_t *src, char *dest) {
     char tmp[8];
     for(uint8_t i = 0; i < MAC_BYTES; i++) {
         sprintf((char *) &tmp, "%02hx:", src[i]);

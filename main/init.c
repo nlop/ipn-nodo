@@ -12,7 +12,6 @@ EventGroupHandle_t nodo_event_group;
 
 /* Funciones locales */
 void close_init_comms(TaskHandle_t send_task, TaskHandle_t recv_task);
-void get_mac_str(uint8_t *src, uint8_t *dest);
 
 // Arrancar la rutina de inicialización del dispositivo
 void nodo_init_dev (EventGroupHandle_t event_group) {
@@ -56,7 +55,6 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     ESP_LOGI(INIT_TAG, "%s: Inicio exitoso : %s", __func__, 
             (arg.init_dev_type == NODO_WIFI ? "NODO_WIFI" : "NODO_BLE" ));
     ESP_LOGI(INIT_TAG, "%s: Listo para cerrar SPP!", __func__);
-    /* Guardar tipo de dispositivo (WiFi) */
     if ( nvs_set_mode(arg.init_dev_type) != 0) {
         ESP_LOGD(INIT_TAG, "%s: Error guardando modo de dispositivo!", __func__);
     }
@@ -68,9 +66,11 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     /* Eliminar los task que atienden el intercambio de datos */
     vTaskDelete(send_task_handle);
     vTaskDelete(recv_task_handle);
+    ESP_LOGI(INIT_TAG, "%s: Borrando init tasks!", __func__);
     /* Eliminar las colas de intercambio de mensajes */
     vQueueDelete(queue_in);
     vQueueDelete(queue_out);
+    ESP_LOGI(INIT_TAG, "%s: Borrando init queues!", __func__);
     if (arg.init_dev_type == NODO_WIFI) {
         nodo_bt_disable();
         ESP_LOGI(INIT_TAG, "%s: Bluetooth desactivado!", __func__);
@@ -80,6 +80,7 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
             ESP_LOGE(INIT_TAG, "%s: Error deshabilitando WiFi!", __func__);
         }
     }
+    vTaskDelay(pdMS_TO_TICKS(SPP_DISCONNECT_TIMEOUT));
 }
 
 void nodo_init_ble_gatts(const EventGroupHandle_t evt_group) {

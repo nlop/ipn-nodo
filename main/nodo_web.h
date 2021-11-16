@@ -21,6 +21,7 @@
 #include "nodo_gattc.h"
 #include "nodo_spiffs.h"
 #include "nodo_nvs.h"
+#include "esp_system.h"
 
 #define WEB_TAG             "NODO WEB"
 #define WSTASK_TAG          "WS TASK"
