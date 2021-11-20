@@ -143,8 +143,7 @@ void websocket_task(void *pvParameters) {
         .user_agent = NODO_USER_AGENT,
         .host = WEBSOCKET_HOST,
         .transport = WEBSOCKET_TRANSPORT_OVER_TCP,
-        .ping_interval_sec = 120,
-        // TODO: menuconfig ~^^
+        .ping_interval_sec = WS_PING_INTERVAL,
 #ifdef WEBSOCKET_PORT
         .port = WEBSOCKET_PORT
 #endif
