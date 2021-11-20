@@ -2,7 +2,7 @@
 Firmware del ESP32 para el proyecto TT2020-B031
 
 ## Instalación del kit de desarrollo
-Instalar el kit de desarrollo ESP-IDF según [estas instrucciones](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#installation-step-by-step). 
+Instalar el kit de desarrollo ESP-IDF según [estas instrucciones](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#installation-step-by-step). **Utilizar la rama estable (stable) al momento de descargar el repositorio**
 Dentro de la carpeta *examples/getting-started* del repositorio de *esp-idf* se pueden encontrar otros ejemplos para
 probar la tarjeta.
 
@@ -31,14 +31,15 @@ para el servicio HTTP y WebSocket. Esto se hace entrando a los submenus de *HTTP
 respectivamente, como se muestra en las imágenes. 
 ![Menú de opciones HTTP](doc/img/menu_http.png)
 ![Menú de opciones WebSockets](doc/img/menu_ws.png)
-## Habilitar/deshabilitar el sensor TSL2561
-En el menu de *Sensores* se puede activar el uso del sensor TSL2561, para medir la luminiscencia  Por default, esta
-opción esta desactivada.
-![Habilitar TSL2561](doc/img/menu_sensores.png)
+## Habilitar o deshabilitar el uso de sensores ópticos
+En el menu de *Sensores* se puede activar el uso del sensor TSL2561 o el sensor BH1750, por default, cualquiera 
+de los dos se encuentra. desactivado. Cabe mencionar que solo una de las dos
+opciones debe de estar seleccionada.
+![Menu de sensores](doc/img/menu_sensores.png)
 
-Nota: En caso de utilizar el TSL2561, se debe de haber clonado previamente el
+Nota: En caso de utilizar cualquier sensor, se debe de clonar previamente el
 repositorio de *esp-idf-lib* ([link](https://github.com/UncleRus/esp-idf-lib)), además de agregar la siguiente 
-linea al archivo *CMakeLists.txt*
+linea al archivo *main/CMakeLists.txt*
 ```
 set(EXTRA_COMPONENT_DIRS <dirección del repositorio>)
 ```
