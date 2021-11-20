@@ -15,16 +15,27 @@ void measure_task(void *pvParameters) {
     esp_adc_cal_characteristics_t *adc1_ch6_chars, *adc1_ch7_chars;
     // Preparar dispositivos
     uint32_t adc_value, lm35_vol, hum_vol;
-#if CONFIG_TSL2561_ENABLED 
-    uint32_t lux;
+#if CONFIG_TSL2561_ENABLED || CONFIG_BH1750_ENABLED
     esp_err_t res;
-    /** Configuración TSL2561 **/
+    /* Inicializar el bus i2c */
     ESP_ERROR_CHECK(i2cdev_init());
+#endif
+#if CONFIG_TSL2561_ENABLED 
+    ESP_LOGI(MEAS_TAG, "Utilizando sensor TSL2561!");
+    uint32_t lux;
     tsl2561_t dev;
     memset(&dev, 0, sizeof(tsl2561_t));
     ESP_ERROR_CHECK(tsl2561_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO));
     ESP_ERROR_CHECK(tsl2561_init(&dev));
     ESP_LOGI(MEAS_TAG, "Found TSL2561 in package %s\n", dev.package_type == TSL2561_PACKAGE_CS ? "CS" : "T/FN/CL");
+#endif
+#if CONFIG_BH1750_ENABLED 
+    ESP_LOGI(MEAS_TAG, "Utilizando sensor BH1750!");
+    uint16_t lux;
+    i2c_dev_t dev;
+    memset(&dev, 0, sizeof(i2c_dev_t));
+    ESP_ERROR_CHECK(bh1750_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO));
+    ESP_ERROR_CHECK(bh1750_setup(&dev, BH1750_MODE_CONTINUOUS, BH1750_RES_HIGH));
 #endif
     /*** Configuración ADC1 ***/
     adc1_config_width(width);
@@ -76,6 +87,13 @@ void measure_task(void *pvParameters) {
 #if CONFIG_TSL2561_ENABLED 
         // TSL2561
         if ((res = tsl2561_read_lux(&dev, &lux)) != ESP_OK)
+            ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
+        else
+            ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
+        mvector_data[2].type = LIGHT;
+        mvector_data[2].value = lux;
+#elif CONFIG_BH1750_ENABLED
+        if ((res = bh1750_read(&dev, &lux)) != ESP_OK)
             ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
         else
             ESP_LOGI(MEAS_TAG, "Lux: %u", lux);

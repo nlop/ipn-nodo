@@ -44,6 +44,9 @@ menu "IPN-NODO Menu"
         config TSL2561_ENABLED
             bool "Utilizar el sensor TSL2561"
             default n
+        config BH1750_ENABLED
+            bool "Utilizar el sensor BH1750"
+            default n
     endmenu
 
     menu "Colas (Queues)"
@@ -80,6 +83,9 @@ menu "IPN-NODO Menu"
             config WEBSOCKET_PORT
             int "Puerto para conexiones por medio de Websockets"
             default 80
+            config WEBSOCKET_PING_INT
+            int "Intervalo para mandar la señal de ping al servidor (segundos)"
+            default 120
         endmenu
     endmenu
 endmenu
