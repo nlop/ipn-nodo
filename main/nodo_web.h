@@ -29,11 +29,14 @@
 #define SERVER_URL          CONFIG_SERVER_URL
 #define HTTP_HOST           SERVER_URL
 #define INIT_PATH           "/dev/new"
-#define WEBSOCKET_HOST      SERVER_URL
 
-#if CONFIG_WEBSOCKET_PORT != 80
 #define WEBSOCKET_PORT      CONFIG_WEBSOCKET_PORT
-#endif
+
+/* Construcción de la cadena URI para ws */
+#define WS_URI_BUILD_(port)     "ws://" SERVER_URL "/:"#port
+#define WS_URI_BUILD(port)     WS_URI_BUILD_(port)
+
+#define WEBSOCKET_URI       WS_URI_BUILD(WEBSOCKET_PORT) 
 
 #if CONFIG_HTTP_PORT != 80
 #define HTTP_PORT           CONFIG_HTTP_PORT
@@ -50,6 +53,7 @@ typedef struct token_ret_t {
     esp_err_t esp_status;
     uint8_t http_status;
     uint8_t *token;
+    size_t token_len;
 } token_ret_t;
 
 

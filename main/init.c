@@ -166,13 +166,24 @@ void send_init_token(uint8_t *token) {
         msg.type = MSG_SERV_CONN_OK;
         ESP_LOGI(WEB_TAG, "Conexión con servidor exitosa!");
         ESP_LOGI(WEB_TAG, "Token: %s", ret.token);
-        // Activar bit TOKEN_OK
-        xEventGroupSetBits(nodo_event_group, TOKEN_OK);
-        if (nvs_save_token((char *) ret.token) != 0) {
-            ESP_LOGE(INIT_TAG, "send_init_token: Error guardando token!");
+        /* Sacar token de JSON obj */
+        cJSON *token_json = cJSON_ParseWithLength( (char *) ret.token, ret.token_len);
+        if ( token_json == NULL ) {
+            ESP_LOGE(INIT_TAG, "%s| Error parsing token_json", __func__);
+            return;
         }
-        ESP_LOGI(INIT_TAG, "Token almacenado exitosamente!");
-        free(ret.token);
+        cJSON *token_str = cJSON_GetObjectItem(token_json, "token");
+        if ( cJSON_IsString(token_str) && token_str->valuestring != NULL ) {
+            if (nvs_save_token(token_str->valuestring) != 0) {
+                ESP_LOGE(INIT_TAG, "send_init_token: Error guardando token!");
+            }
+            ESP_LOGI(INIT_TAG, "Token almacenado exitosamente!");
+            // Activar bit TOKEN_OK
+            xEventGroupSetBits(nodo_event_group, TOKEN_OK);
+            free(ret.token);
+        } else {
+            ESP_LOGE(INIT_TAG, "%s| Error parsing token_json", __func__);
+        }
     } else {
         ESP_LOGI(WEB_TAG, "Conexión con servidor falló!");
         msg.type = MSG_SERV_CONN_FAIL;
@@ -228,7 +239,7 @@ void init_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
         msg_conn_ok.type = MSG_WIFI_CONN_FAIL;
         xEventGroupClearBits(evt_group, COMM_CHANNEL_OK);
     }
-     xQueueSendToBack(queue_out, &msg_conn_ok, portMAX_DELAY);
+    xQueueSendToBack(queue_out, &msg_conn_ok, portMAX_DELAY);
 }
 
 /**

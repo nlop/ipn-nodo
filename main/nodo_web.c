@@ -73,6 +73,7 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
             response_body[response_len] = '\0';
             ret.esp_status = ESP_OK; 
             ret.token = response_body;
+            ret.token_len = res_len;
         } else {
             ESP_LOGE(WEB_TAG, "%s: Error reordenando memoria para token", __func__);
             free(response_body);
@@ -131,6 +132,7 @@ esp_err_t nodo_http_init_handler(esp_http_client_event_t *evt)
 static uint16_t const init_char[] = { TEST_DISCOVERY_UUID };
 
 void websocket_task(void *pvParameters) {
+    static char headers[512];
     ws_queue_msg_t msg = {0};
     ws_task_arg_t *arg;
     arg = (ws_task_arg_t *) pvParameters;
@@ -138,15 +140,16 @@ void websocket_task(void *pvParameters) {
     ESP_LOGI(WSTASK_TAG, "Esperando conexión WiFi...");
     xEventGroupWaitBits(arg->nodo_evt_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
     ESP_LOGI(WSTASK_TAG, "Preparando WebSocket...");
+    /* Acomodar header para token */
+    sprintf(headers, "Authorization: %s\r\n", arg->token);
+    /*             Importante!   ~~~~~^^^^*/
     // Configurar cliente WebSocket
-    esp_websocket_client_config_t websocket_cfg = { 
+    esp_websocket_client_config_t websocket_cfg = {
         .user_agent = NODO_USER_AGENT,
-        .host = WEBSOCKET_HOST,
+        .uri = WEBSOCKET_URI,
         .transport = WEBSOCKET_TRANSPORT_OVER_TCP,
         .ping_interval_sec = WS_PING_INTERVAL,
-#ifdef WEBSOCKET_PORT
-        .port = WEBSOCKET_PORT
-#endif
+        .headers = headers,
     };
     esp_websocket_client_handle_t ws_client = esp_websocket_client_init(&websocket_cfg);
     // Registrar handler para WEBSOCKET_EVENT_CONNECTED/DISCONNECTED
@@ -169,7 +172,7 @@ void websocket_task(void *pvParameters) {
             ESP_LOGI(WSTASK_TAG, "MSG_MEAS_VECTOR");
             // TODO: Manejar error donde buffer no puede almacenar JSON
             cJSON *mvector_json = get_measure_vector_json(msg.meas_vector); //(char *) &buffer, JSON_BUFFER_SIZE);
-            json_wrap_message_buff(STATUS_OK, LIVE_DATA, mvector_json, buffer, JSON_BUFFER_SIZE );
+            json_wrap_message_buff(STATUS_OK, SAVE_DATA, mvector_json, buffer, JSON_BUFFER_SIZE );
             ESP_LOGI(WSTASK_TAG, "Enviando mensaje al servidor...");
             ESP_LOGI(WSTASK_TAG, "JSON:\n%s", buffer);
             //ESP_LOGI(WSTASK_TAG, "JSON:\n%s", json_str);
