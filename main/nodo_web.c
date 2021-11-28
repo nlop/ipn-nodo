@@ -23,15 +23,14 @@ extern spiffs_db_t gattc_db;
  * Configuración del cliente HTTP para enviar el token
  */
 esp_http_client_config_t config = {
-    //.host = HTTP_HOST,
-    .url = "http://protipomonitoreoplantas.herokuapp.com/api/nodo_central/activate",
-    //.path = INIT_PATH,
+    .host = HTTP_HOST,
+    .path = INIT_PATH,
     .event_handler = nodo_http_init_handler,
     .user_agent = NODO_USER_AGENT,
     .transport_type = HTTP_TRANSPORT_OVER_TCP,
-    //#ifdef HTTP_PORT
-    //    .port = HTTP_PORT
-    //#endif
+#ifdef HTTP_PORT
+    .port = HTTP_PORT
+#endif
 };
 
 /*

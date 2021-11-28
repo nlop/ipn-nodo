@@ -28,8 +28,7 @@
 #define NODO_USER_AGENT     CONFIG_WEB_USER_AGENT
 #define SERVER_URL          CONFIG_SERVER_URL
 #define HTTP_HOST           SERVER_URL
-//#define INIT_PATH           "/api/nodo_central/activate"
-#define INIT_PATH           "/dev/new"
+#define INIT_PATH           "/api/nodo_central/activate"
 
 #define WEBSOCKET_PORT      CONFIG_WEBSOCKET_PORT
 
