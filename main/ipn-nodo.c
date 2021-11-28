@@ -84,9 +84,6 @@ void app_main(void) {
             ESP_LOGI(MAIN_TAG, "Inicializando estación: normal boot");
             nodo_wifi_init(start_notify_connected_cb, nodo_evt_group);
             nodo_wifi_set_credentials(ssid, psk);
-            /* Sincronizar el tiempo con NTP */
-            // TODO: Sincronizar en first boot
-            sync_time();
         } else {
             ESP_LOGI(MAIN_TAG, "No se ha configurado!\nInicializando estación: first boot...");
             nodo_init_dev(nodo_evt_group);
@@ -102,6 +99,12 @@ void app_main(void) {
             ESP_LOGD(MAIN_TAG, "%s: Error leyendo DEV_TYPE en iniciación!", __func__);
             return;
         }
+    }
+    /* Sincronizar el tiempo con NTP */
+    if ( dev_type == NODO_WIFI || dev_type == SINKNODE ) {
+        // TODO: Cambiar portMAX_DELAY par no atorar
+        xEventGroupWaitBits(nodo_evt_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
+        sync_time();
     }
     ESP_LOGI(MAIN_TAG, "%s: Arrancando tareas...", __func__);
     start(dev_type, nodo_evt_group);

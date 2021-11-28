@@ -3,8 +3,8 @@
 #define MAX_SEND_ATTEMPTS       6    // Numero máximo de intentos para intercambiar el token temporal
 
 esp_err_t nodo_http_init_handler(esp_http_client_event_t *evt);
-uint8_t *response_body = NULL;
-uint8_t response_len = 0;
+static char *response_body = NULL;
+static int response_len = 0;
 /** Funciones locales **/
 static void ws_evt_handler_conn(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
@@ -23,14 +23,15 @@ extern spiffs_db_t gattc_db;
  * Configuración del cliente HTTP para enviar el token
  */
 esp_http_client_config_t config = {
-    .host = HTTP_HOST,
-    .path = INIT_PATH,
+    //.host = HTTP_HOST,
+    .url = "http://protipomonitoreoplantas.herokuapp.com/api/nodo_central/activate",
+    //.path = INIT_PATH,
     .event_handler = nodo_http_init_handler,
     .user_agent = NODO_USER_AGENT,
     .transport_type = HTTP_TRANSPORT_OVER_TCP,
-#ifdef HTTP_PORT
-    .port = HTTP_PORT
-#endif
+    //#ifdef HTTP_PORT
+    //    .port = HTTP_PORT
+    //#endif
 };
 
 /*
@@ -44,10 +45,20 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     /* Crear cadena JSON */
     // TODO: Cambiar al nuevo formato gral
     cJSON *json_obj = cJSON_CreateObject();
+    if ( json_obj == NULL ) {
+        ESP_LOGE(WEB_TAG, "%s| Error creando objeto JSON", __func__);
+        ret.esp_status = ESP_FAIL;
+        return ret;
+    }
     cJSON *token_val = cJSON_CreateString((char *) token);
+    if ( token_val == NULL ) {
+        ESP_LOGE(WEB_TAG, "%s| Error cadena token_val JSON", __func__);
+        ret.esp_status = ESP_FAIL;
+        return ret;
+    }
     cJSON_AddItemToObject(json_obj, "token", token_val);
-    cJSON *mac_val = cJSON_CreateString(mac);
-    cJSON_AddItemToObject(json_obj, "mac", mac_val);
+    //cJSON *mac_val = cJSON_CreateString(mac);
+    //cJSON_AddItemToObject(json_obj, "mac", mac_val);
     char *post_data = cJSON_PrintUnformatted(json_obj);
     cJSON_Delete(json_obj);
     ESP_LOGD(WEB_TAG, "%s: Body : %s",__func__, post_data);
@@ -65,15 +76,15 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     if (err == ESP_OK) {
         ret.http_status = esp_http_client_get_status_code(client);
         uint8_t res_len = esp_http_client_get_content_length(client);
-        ESP_LOGI(WEB_TAG, "%s: HTTP POST Status = %d, content_length = %d",
+        ESP_LOGI(WEB_TAG, "%s: HTTP GET Status = %d, content_length = %d",
                 __func__, esp_http_client_get_status_code(client), res_len);
-        //esp_log_buffer_hex(WEB_TAG, response_body, response_len);
-        response_body = (uint8_t *) reallocarray(response_body, response_len + 1, sizeof(uint8_t));
+        response_body = (char *) reallocarray(response_body, response_len + 1, sizeof(uint8_t));
+        esp_log_buffer_hex(WEB_TAG, response_body, response_len);
         if (response_body != NULL) {
             response_body[response_len] = '\0';
             ret.esp_status = ESP_OK; 
             ret.token = response_body;
-            ret.token_len = res_len;
+            ret.token_len = response_len;
         } else {
             ESP_LOGE(WEB_TAG, "%s: Error reordenando memoria para token", __func__);
             free(response_body);
@@ -81,7 +92,7 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
         response_len = 0;
         response_body = NULL;
     } else {
-        ESP_LOGE(WEB_TAG, "%s: HTTP POST request failed: %s", __func__, esp_err_to_name(err));
+        ESP_LOGE(WEB_TAG, "%s: HTTP GET request failed: %s", __func__, esp_err_to_name(err));
         ret.esp_status = ESP_FAIL;
     }
     esp_http_client_cleanup(client);
@@ -89,6 +100,43 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     return ret;
 }
 
+void http_get_token(void) {
+    esp_err_t err;
+    config.host = "20.121.195.167";
+    config.path = "/dev/test";
+    //config.path = "/api/nodo_central/test";
+    config.port = 8080;
+    /* Preparar cliente HTTP */
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_method(client, HTTP_METHOD_GET);
+    /* Realizar petición */
+    uint8_t i = 0;
+    /* Reintentar y esperar hasta MAX_SEND_ATTEMPTS intentos */
+    while( (err = esp_http_client_perform(client)) != ESP_OK && i < MAX_SEND_ATTEMPTS) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+    if (err == ESP_OK) {
+        int res_len = esp_http_client_get_content_length(client);
+        ESP_LOGI(WEB_TAG, "%s: HTTP GET Status = %d, content_length = %d",
+                __func__, esp_http_client_get_status_code(client), res_len);
+        //response_body = (uint8_t *) reallocarray(response_body, response_len + 1, sizeof(uint8_t));
+        //if (response_body != NULL) {
+        //    response_body[response_len] = '\0';
+        //} else {
+        //    ESP_LOGE(WEB_TAG, "%s: Error reordenando memoria para token", __func__);
+        //    free(response_body);
+        //}
+    } else {
+        ESP_LOGE(WEB_TAG, "%s: HTTP GET request failed: %s", __func__, esp_err_to_name(err));
+    }
+    ESP_LOG_BUFFER_CHAR(WEB_TAG, response_body, response_len);
+    if ( response_body != NULL ) {
+        response_len = 0;
+        response_body = NULL;
+        free(response_body);
+    }
+    esp_http_client_cleanup(client);
+}
 esp_err_t nodo_http_init_handler(esp_http_client_event_t *evt)
 {
     switch(evt->event_id) {
@@ -103,20 +151,22 @@ esp_err_t nodo_http_init_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_ON_HEADER:
             ESP_LOGI(WEB_TAG, "HTTP_EVENT_ON_HEADER");
-            printf("%.*s", evt->data_len, (char*)evt->data);
+            ESP_LOGI(WEB_TAG, "%.*s", evt->data_len, (char*)evt->data);
             break;
         case HTTP_EVENT_ON_DATA:
-            ESP_LOGI(WEB_TAG, "HTTP_EVENT_ON_DATA");
-            if (response_body == NULL) {
-                response_len = 0;
-                response_body = (uint8_t *) malloc(esp_http_client_get_content_length(evt->client));
+            ESP_LOGI(WEB_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            if (!esp_http_client_is_chunked_response(evt->client)) {
                 if (response_body == NULL) {
-                    ESP_LOGE(WEB_TAG, "Failed to allocate memory for output buffer");
-                    return ESP_FAIL;
+                    response_body = (char *) malloc(esp_http_client_get_content_length(evt->client));
+                    response_len = 0;
+                    if (response_body == NULL) {
+                        ESP_LOGE(WEB_TAG, "Failed to allocate memory for output buffer");
+                        return ESP_FAIL;
+                    }
                 }
+                memcpy(response_body + response_len, evt->data, evt->data_len);
+                response_len += evt->data_len;
             }
-            memcpy(response_body + response_len, evt->data, evt->data_len);
-            response_len += evt->data_len;
             break;
         case HTTP_EVENT_ON_FINISH:
             ESP_LOGI(WEB_TAG, "HTTP_EVENT_ON_FINISH");
@@ -330,7 +380,7 @@ void gattc_ws_callback(nodo_gattc_events_t evt, void *arg) {
             return;
         }
         if ( ( dev_type == NODO_WIFI ) && ( nvs_set_mode(SINKNODE) != 0 ) ) {
-                ESP_LOGE(WSTASK_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
+            ESP_LOGE(WSTASK_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
         }
         spiffs_umount();
         vTaskDelay(pdMS_TO_TICKS(3000));

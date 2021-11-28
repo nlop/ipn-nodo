@@ -28,6 +28,7 @@
 #define NODO_USER_AGENT     CONFIG_WEB_USER_AGENT
 #define SERVER_URL          CONFIG_SERVER_URL
 #define HTTP_HOST           SERVER_URL
+//#define INIT_PATH           "/api/nodo_central/activate"
 #define INIT_PATH           "/dev/new"
 
 #define WEBSOCKET_PORT      CONFIG_WEBSOCKET_PORT
@@ -52,7 +53,7 @@ typedef void (*token_revc_cb_t)(uint8_t *token);
 typedef struct token_ret_t {
     esp_err_t esp_status;
     uint8_t http_status;
-    uint8_t *token;
+    char *token;
     size_t token_len;
 } token_ret_t;
 
@@ -69,6 +70,7 @@ typedef struct ws_task_arg_t {
 token_ret_t http_send_token(uint8_t *token, const char *mac);
 void websocket_task(void *pvParameters);
 void gattc_ws_callback(nodo_gattc_events_t evt, void *arg);
+void http_get_token(void);
 
     
 #endif

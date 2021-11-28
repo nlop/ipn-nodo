@@ -165,7 +165,7 @@ void send_init_token(uint8_t *token) {
     if (ret.esp_status == ESP_OK && ret.http_status == 200) {
         msg.type = MSG_SERV_CONN_OK;
         ESP_LOGI(WEB_TAG, "Conexión con servidor exitosa!");
-        ESP_LOGI(WEB_TAG, "Token: %s", ret.token);
+        ESP_LOGI(WEB_TAG, "Token: %s [len = %zu]", ret.token, ret.token_len);
         /* Sacar token de JSON obj */
         cJSON *token_json = cJSON_ParseWithLength( (char *) ret.token, ret.token_len);
         if ( token_json == NULL ) {
