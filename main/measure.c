@@ -42,14 +42,14 @@ void measure_task(void *pvParameters) {
     // Canal 6 del ADC1 (GPIO34)
     adc1_config_channel_atten(adc_lm35, atten);
     // Canal 7 del ADC1 (GPIO35)
-    adc1_config_channel_atten(adc_hum, ADC_ATTEN_DB_6);
+    adc1_config_channel_atten(adc_hum, ADC_ATTEN_DB_11);
     //Caracterizacion ADC -- Declarar la curva de conversión para el ADC
     // Canal 6
     adc1_ch6_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     esp_adc_cal_characterize(ADC_UNIT_1, atten, width, DEFAULT_VREF, adc1_ch6_chars);
     // Canal 7
     adc1_ch7_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_6, width, DEFAULT_VREF, adc1_ch7_chars);
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, width, DEFAULT_VREF, adc1_ch7_chars);
     // Esperar a que se alce el evento HTTP_OK
     ESP_LOGI(MEAS_TAG, "Esperando a HTTP_OK, GATT_TASK_OK (COMM_DISPATCHER_OK) ...");
     xEventGroupWaitBits(arg->nodo_evt_group, COMM_DISPATCHER_OK, pdFALSE, pdFALSE, portMAX_DELAY);

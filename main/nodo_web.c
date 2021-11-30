@@ -447,12 +447,22 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
     cJSON *meas_array = cJSON_CreateArray();
     cJSON_AddItemToObject(json_obj, "measurements", meas_array);
     for(uint8_t i = 0; i < mvector->len; i++) {
+        // TODO: Manejar cJSON == NULL
         cJSON *meas_obj = cJSON_CreateObject();
         cJSON_AddItemToArray(meas_array, meas_obj);
         cJSON *type_str = cJSON_CreateString(get_measure_str(mvector->data[i].type));
         cJSON_AddItemToObject(meas_obj, "type", type_str);
-        cJSON *val = cJSON_CreateNumber(mvector->data[i].value); 
-        cJSON_AddItemToObject(meas_obj, "value", val);
+        cJSON *val = NULL;
+        if ( mvector->data[i].type == HUMIDITY) {
+            uint16_t hum_raw = mvector->data[i].value;
+            float hum_perc = ( -200.0 * hum_raw * 0.001 ) / 3 + 161.333;
+            val = cJSON_CreateNumber(hum_perc); 
+        } else {
+            val = cJSON_CreateNumber(mvector->data[i].value); 
+        }
+        if ( val != NULL ) {
+            cJSON_AddItemToObject(meas_obj, "value", val);
+        }
     }
     free(timestamp);
     return json_obj;
