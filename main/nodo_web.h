@@ -32,12 +32,6 @@
 
 #define WEBSOCKET_PORT      CONFIG_WEBSOCKET_PORT
 
-/* Construcción de la cadena URI para ws */
-#define WS_URI_BUILD_(port)     "ws://" SERVER_URL "/:"#port
-#define WS_URI_BUILD(port)     WS_URI_BUILD_(port)
-
-#define WEBSOCKET_URI       WS_URI_BUILD(WEBSOCKET_PORT) 
-
 #if CONFIG_HTTP_PORT != 80
 #define HTTP_PORT           CONFIG_HTTP_PORT
 #endif

@@ -195,7 +195,8 @@ void websocket_task(void *pvParameters) {
     // Configurar cliente WebSocket
     esp_websocket_client_config_t websocket_cfg = {
         .user_agent = NODO_USER_AGENT,
-        .uri = WEBSOCKET_URI,
+        .host = SERVER_URL,
+        .port = WEBSOCKET_PORT,
         .transport = WEBSOCKET_TRANSPORT_OVER_TCP,
         .ping_interval_sec = WS_PING_INTERVAL,
         .headers = headers,
