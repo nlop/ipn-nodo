@@ -78,7 +78,7 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
         ESP_LOGI(WEB_TAG, "%s: HTTP GET Status = %d, content_length = %d",
                 __func__, esp_http_client_get_status_code(client), res_len);
         response_body = (char *) reallocarray(response_body, response_len + 1, sizeof(uint8_t));
-        esp_log_buffer_hex(WEB_TAG, response_body, response_len);
+        //esp_log_buffer_hex(WEB_TAG, response_body, response_len);
         if (response_body != NULL) {
             response_body[response_len] = '\0';
             ret.esp_status = ESP_OK; 
@@ -99,43 +99,6 @@ token_ret_t http_send_token(uint8_t *token, const char *mac) {
     return ret;
 }
 
-void http_get_token(void) {
-    esp_err_t err;
-    config.host = "20.121.195.167";
-    config.path = "/dev/test";
-    //config.path = "/api/nodo_central/test";
-    config.port = 8080;
-    /* Preparar cliente HTTP */
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_method(client, HTTP_METHOD_GET);
-    /* Realizar petición */
-    uint8_t i = 0;
-    /* Reintentar y esperar hasta MAX_SEND_ATTEMPTS intentos */
-    while( (err = esp_http_client_perform(client)) != ESP_OK && i < MAX_SEND_ATTEMPTS) {
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-    if (err == ESP_OK) {
-        int res_len = esp_http_client_get_content_length(client);
-        ESP_LOGI(WEB_TAG, "%s: HTTP GET Status = %d, content_length = %d",
-                __func__, esp_http_client_get_status_code(client), res_len);
-        //response_body = (uint8_t *) reallocarray(response_body, response_len + 1, sizeof(uint8_t));
-        //if (response_body != NULL) {
-        //    response_body[response_len] = '\0';
-        //} else {
-        //    ESP_LOGE(WEB_TAG, "%s: Error reordenando memoria para token", __func__);
-        //    free(response_body);
-        //}
-    } else {
-        ESP_LOGE(WEB_TAG, "%s: HTTP GET request failed: %s", __func__, esp_err_to_name(err));
-    }
-    ESP_LOG_BUFFER_CHAR(WEB_TAG, response_body, response_len);
-    if ( response_body != NULL ) {
-        response_len = 0;
-        response_body = NULL;
-        free(response_body);
-    }
-    esp_http_client_cleanup(client);
-}
 esp_err_t nodo_http_init_handler(esp_http_client_event_t *evt)
 {
     switch(evt->event_id) {

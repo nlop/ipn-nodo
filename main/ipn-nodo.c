@@ -3,6 +3,7 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "esp_pm.h"
 #include "init.h"
 #include "nodo_nvs.h"
 #include "nodo_web.h"
@@ -31,8 +32,9 @@ const static uint16_t chars[3] = { TEMP_CHAR_UUID, HUMIDITY_CHAR_UUID, LUX_CHAR_
 spiffs_db_t gattc_db = {0};
 
 dev_type_t dev_type = 0;            /* Tipo de dispositivo que esta corriendo (BLE, WIFI, WIFI + BLE) */
+/**********************/
 
-TaskHandle_t ws_task_handle;
+static TaskHandle_t ws_task_handle;
 
 void app_main(void) {
     /* TODO:
@@ -51,8 +53,17 @@ void app_main(void) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
-
     ESP_ERROR_CHECK( ret );
+    /* Bajar la frecuencia del procesador */
+    esp_pm_config_esp32_t pm_config = {
+        .light_sleep_enable = false,
+        .max_freq_mhz = 160,
+        .min_freq_mhz = 80,
+    };
+    ret = esp_pm_configure(&pm_config);
+    if ( ret != ESP_OK ) {
+        ESP_LOGE(INIT_TAG, "%s| Error ajustando frecuencia del procesador!", __func__);
+    }
     /* Crear EventGroup para eventos del nodo */
     EventGroupHandle_t nodo_evt_group = xEventGroupCreate();
     if (nodo_evt_group == NULL) {

@@ -83,7 +83,7 @@ nodo_ap_scan_results_t nodo_wifi_scan() {
 }
 
 void nodo_wifi_set_credentials(uint8_t *ssid, uint8_t *psk) {
-    ESP_EARLY_LOGI(WIFI_TAG, "Intentando conexión con credenciales %s:%s", ssid, psk);
+    ESP_EARLY_LOGI(WIFI_TAG, "%s| Intentando conexión con credenciales %s:%s", __func__, ssid, psk);
     // Estructura de configuración para AP
     wifi_config_t wifi_config = {
         .sta = {
@@ -95,11 +95,16 @@ void nodo_wifi_set_credentials(uint8_t *ssid, uint8_t *psk) {
                 .capable = true,
                 .required = false
             },
+            .listen_interval = 4, // Aumentar el intervalo para recibir beacons
         },
     };
     memcpy(wifi_config.sta.ssid, ssid, strlen((char*) ssid));
     memcpy(wifi_config.sta.password, psk, strlen((char*) psk));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    esp_err_t ret = esp_wifi_set_ps(WIFI_PS_MAX_MODEM);
+    if ( ret != ESP_OK ) {
+        ESP_EARLY_LOGE(WIFI_TAG, "%s| Error configurando power saving!", __func__);
+    }
     ESP_EARLY_LOGI(WIFI_TAG, "Conectando a %s...", ssid);
     esp_wifi_connect();
 }
