@@ -40,7 +40,7 @@ static gattc_char_vec_t server_chars = { .chars = NULL, .len = 0 };
 static measure_t measure_data[3];
 static measure_vector_t meas_vec = {.data = measure_data, .len = 3, .dev_addr = "GATTS_NODE_ADDR" };
 /* Contenedor para mensajes al ws */
-static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR, .meas_vector = &meas_vec };
+static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR_NORM, .meas_vector = &meas_vec };
 extern TaskHandle_t ws_task_handle;
 
 /* TODO: reducir ESP_LOGIs del módulo */

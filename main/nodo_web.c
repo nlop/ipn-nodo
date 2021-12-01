@@ -11,7 +11,7 @@ static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32
 cJSON *get_measure_vector_json(measure_vector_t *mvector);
 int json_wrap_message_buff(enum json_msg_status_t , enum json_msg_type_t ,  cJSON *, char *, size_t);
 char *get_timestamp();
-void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue);
+void ws_message_handler(cJSON *msg, ws_msg_handler_arg_t *args);
 cJSON *get_generic_msg_json(esp_err_t esp_status, uint8_t status);
 
 extern dev_type_t dev_type;
@@ -182,9 +182,12 @@ static uint16_t const init_char[] = { TEST_DISCOVERY_UUID };
 
 void websocket_task(void *pvParameters) {
     static char headers[512];
+    static ws_msg_handler_arg_t handler_arg;
     ws_queue_msg_t msg = {0};
     ws_task_arg_t *arg;
     arg = (ws_task_arg_t *) pvParameters;
+    handler_arg.ctrl_queue = arg->ctrl_queue;
+    handler_arg.out_queue = arg->out_queue;
     // Esperar a que haya conexión WiFI
     ESP_LOGI(WSTASK_TAG, "Esperando conexión WiFi...");
     xEventGroupWaitBits(arg->nodo_evt_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
@@ -206,7 +209,7 @@ void websocket_task(void *pvParameters) {
     esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_CONNECTED, ws_evt_handler_conn, (void *) &(arg->nodo_evt_group));
     esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DISCONNECTED, ws_evt_handler_conn, (void *) &(arg->nodo_evt_group));
     // Registrar handler para WEBSOCKET_EVENT_DATA/ERROR
-    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DATA, ws_evt_handler_data, &(arg->out_queue));
+    esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_DATA, ws_evt_handler_data, &handler_arg);
     esp_websocket_register_events(ws_client, WEBSOCKET_EVENT_ERROR, ws_evt_handler_data, NULL); // NULL : user ctx
     esp_websocket_client_start(ws_client);
     while (esp_websocket_client_is_connected(ws_client) != true) {
@@ -218,11 +221,14 @@ void websocket_task(void *pvParameters) {
         ESP_LOGI(WSTASK_TAG, "Esperando mensajes..");
         xQueueReceive(arg->out_queue, (void *) &msg, portMAX_DELAY);
         memset(buffer, 0, JSON_BUFFER_SIZE);
-        if (msg.type == MSG_MEAS_VECTOR) {
+        if (msg.type == MSG_MEAS_VECTOR_INST || MSG_MEAS_VECTOR_NORM) {
             ESP_LOGI(WSTASK_TAG, "MSG_MEAS_VECTOR");
             // TODO: Manejar error donde buffer no puede almacenar JSON
             cJSON *mvector_json = get_measure_vector_json(msg.meas_vector); //(char *) &buffer, JSON_BUFFER_SIZE);
-            json_wrap_message_buff(STATUS_OK, SAVE_DATA, mvector_json, buffer, JSON_BUFFER_SIZE );
+            json_wrap_message_buff(STATUS_OK, 
+                    (msg.type == MSG_MEAS_VECTOR_INST) ? LIVE_DATA : SAVE_DATA,
+                     mvector_json, buffer, 
+                     JSON_BUFFER_SIZE );
             ESP_LOGI(WSTASK_TAG, "Enviando mensaje al servidor...");
             ESP_LOGI(WSTASK_TAG, "JSON:\n%s", buffer);
             //ESP_LOGI(WSTASK_TAG, "JSON:\n%s", json_str);
@@ -263,7 +269,7 @@ static void ws_evt_handler_conn(void *handler_args, esp_event_base_t base, int32
 // Websocket handler para intercambio de paquetes de datos
 static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
-    QueueHandle_t *ws_queue = (QueueHandle_t *) handler_args;
+    //QueueHandle_t *ws_queue = (QueueHandle_t *) handler_args;
     switch (event_id) {
         case WEBSOCKET_EVENT_DATA:
             ESP_LOGI(WSTASK_TAG, "WEBSOCKET_EVENT_DATA");
@@ -280,7 +286,7 @@ static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32
                     ESP_LOGE(WSTASK_TAG, "%s Error parsing message", __func__);
                     break;
                 }
-                ws_message_handler(msg_json, ws_queue);
+                ws_message_handler(msg_json, (ws_msg_handler_arg_t *) handler_args );
                 cJSON_Delete(msg_json); 
             }
             //ESP_LOGI(WSTASK_TAG, "Total payload length=%d, data_len=%d, current payload offset=%d", data->payload_len, data->data_len, data->payload_offset);
@@ -300,7 +306,7 @@ static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32
  *      ws_queue : Handle para la cola de mensajes del WebSocket. Usado para
  *      envíar respuesta a mensajes que lo necesiten.
  */
-void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
+void ws_message_handler(cJSON *msg, ws_msg_handler_arg_t *args) {
     ESP_LOGI(WSTASK_TAG, "%s", __func__);
     cJSON *msg_type = cJSON_GetObjectItem(msg, "type");
     if ( !cJSON_IsString(msg_type) && msg_type->valuestring == NULL ) {
@@ -312,6 +318,18 @@ void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
         ESP_LOGE(WSTASK_TAG, "%s: Error parsing content", __func__);
         return; 
     }
+    if ( strcmp(msg_type->valuestring, "req-inst-data") == 0 ) {
+        /* Preparar el argumento para el callback */
+        cJSON *child = cJSON_GetObjectItem(content, "devAddr");
+        if ( child == NULL ) {
+            ESP_LOGE(WSTASK_TAG, "%s| Error parsing req-inst-data!", __func__);
+            return;
+        }
+        ctrl_msg_t ctrl_msg = {.type = MSG_MEASURE_INST, .remote_addr = NULL};  
+        /* Notificar al control */
+        xQueueSendToBack(args->ctrl_queue,&ctrl_msg, portMAX_DELAY);
+    }
+    /* TODO: Refactorizar a la parte de control en measure.c */
     if ( strcmp(msg_type->valuestring, "esp-dev-discovery") == 0 ) {
         uint8_t *addr;
         /* Preparar el argumento para el callback */
@@ -329,7 +347,7 @@ void ws_message_handler(cJSON *msg, QueueHandle_t *ws_queue) {
                 ESP_LOGE(WSTASK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
                 return;
             }
-            if (init_gatt_client(*ws_queue) != 0) {
+            if (init_gatt_client(args->out_queue) != 0) {
                 ESP_LOGE(WSTASK_TAG, "%s: Error levantando cliente GATT!", __func__); 
                 return;
             }

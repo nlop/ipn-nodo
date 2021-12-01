@@ -242,7 +242,7 @@ void gatt_task(void *pvParameters) {
     for(;;) {
         ESP_LOGD(GATT_TASK_TAG, "Esperando mensaje...");
         xQueueReceive(arg->out_queue, (void *) &msg, portMAX_DELAY);
-        if (msg.type == MSG_MEAS_VECTOR) {
+        if (msg.type == MSG_MEAS_VECTOR_NORM) {
             for(uint8_t i = 0; i < msg.meas_vector->len; i++) {
                 measure_t measure = msg.meas_vector->data[i];
                 switch (measure.type) {

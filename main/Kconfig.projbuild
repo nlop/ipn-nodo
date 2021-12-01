@@ -60,8 +60,14 @@ menu "IPN-NODO Menu"
         int "Número de espacios para la cola de mensajes WebSocket"
         default 6
         help
-            Número de estructuras de datos de tipo ws_queue_msg_t que puede almacenar la cosa usada
+            Número de estructuras de datos de tipo ws_queue_msg_t que puede almacenar la cola usada
             para en envío de mensajes a traves del WebSocket
+        config CTRL_QUEUE_LEN
+        int "Número de espacios para la cola de mensajes de control"
+        default 5
+        help
+            Número de estructuras de datos de tipo ctrl_msg_t que puede almacenar la cola que entra al 
+            módulo de control, usada para recibir instrucciones desde los canales de comunicación.
     endmenu
 
     menu "Protocolos Web"

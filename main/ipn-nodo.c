@@ -118,7 +118,7 @@ void app_main(void) {
  *      del nodo
  */
 int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
-    QueueHandle_t queue_out = 0;
+    QueueHandle_t queue_out, ctrl_queue;
     //QueueHandle_t queue_out;
     TaskHandle_t meas_task_handle;
     BaseType_t ret;
@@ -131,11 +131,21 @@ int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
             return -1;
         }
         queue_out = xQueueCreate(WS_QUEUE_LEN, sizeof(ws_queue_msg_t));
+        if ( queue_out == NULL ) {
+            ESP_LOGE(MAIN_TAG, "%s| Error creando cola de mensajes COMM_DISPATCHER!", __func__);
+            return -1;
+        }
+        ctrl_queue = xQueueCreate(CTRL_QUEUE_LEN, sizeof(ctrl_msg_t));
+        if ( ctrl_queue == NULL ) {
+            ESP_LOGE(MAIN_TAG, "%s| Error creando cola de mensajes CTRL!", __func__);
+            return -1;
+        }
         // Arrancar Task WEBSOCKET
         ws_task_arg_t *ws_arg = (ws_task_arg_t *) calloc(1, sizeof(ws_task_arg_t));
         ws_arg->token = token;
         ws_arg->nodo_evt_group = evt_group;
         ws_arg->out_queue = queue_out;
+        ws_arg->ctrl_queue = ctrl_queue;
         ret = xTaskCreate(
                 websocket_task,
                 "websocket_task",
@@ -190,6 +200,7 @@ int start(dev_type_t dev_type, const EventGroupHandle_t evt_group) {
     meas_task_arg_t *meas_arg = (meas_task_arg_t *) calloc(1, sizeof(meas_task_arg_t));
     meas_arg->nodo_evt_group = evt_group;
     meas_arg->out_queue = queue_out;
+    meas_arg->ctrl_queue = ( dev_type == SINKNODE || dev_type == NODO_WIFI ) ? ctrl_queue : NULL;
     meas_arg->gattc_db = ( dev_type == SINKNODE ) ? &gattc_db : NULL;
     ret = xTaskCreate(
             measure_task, 

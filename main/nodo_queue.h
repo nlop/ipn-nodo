@@ -8,6 +8,7 @@
 /** Message Queues **/
 #define SPP_QUEUE_LEN       CONFIG_SPP_QUEUE_LEN
 #define WS_QUEUE_LEN        CONFIG_WS_QUEUE_LEN
+#define CTRL_QUEUE_LEN      CONFIG_CTRL_QUEUE_LEN
 #define GATT_QUEUE_LEN      5
 
 /* TODO: Refactor!!!! */
@@ -32,11 +33,15 @@ enum spp_msg_type_t {
 };
 
 enum ws_msg_type_t  {
-    MSG_MEAS_VECTOR,
+    MSG_MEAS_VECTOR_INST,
+    MSG_MEAS_VECTOR_NORM,
     MSG_STATUS_GENERIC
 };
 
-
+enum ctrl_msg_type_t {
+    MSG_MEASURE_INST,
+    MSG_MEASURE_PH,
+};
 
 /** Estructuras **/
 
@@ -97,5 +102,14 @@ typedef struct ws_queue_msg_t {
         ws_status_generic status;    
     };
 } ws_queue_msg_t;
+
+typedef struct ctrl_msg_t {
+    enum ctrl_msg_type_t type;
+    union {
+        /* Dirección para lectura instantanea (MSG_MEASURE_INST) de nodo remoto, 
+         * si es NULL, leer sensores integrados */
+        uint8_t *remote_addr;       
+    };
+} ctrl_msg_t;
 
 #endif

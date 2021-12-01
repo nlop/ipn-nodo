@@ -42,6 +42,7 @@
 /** Estructuras **/
 typedef struct meas_task_arg_t {
     QueueHandle_t out_queue;            // Cola para recibir paquetes enviados por otros tasks
+    QueueHandle_t ctrl_queue;
     EventGroupHandle_t nodo_evt_group;  // Handle al event group de todo el nodo. Usado para
                                         // esperar al evento HTTP_OK
     spiffs_db_t *gattc_db;

@@ -50,14 +50,18 @@ typedef struct token_ret_t {
     size_t token_len;
 } token_ret_t;
 
-
-
 typedef struct ws_task_arg_t {
     QueueHandle_t out_queue;                /* Cola para recibir paquetes enviados por otros tasks */
+    QueueHandle_t ctrl_queue;               /* Cola para recibir mensajes de control */
     EventGroupHandle_t nodo_evt_group;      /* Handle al event group de todo el nodo. Usado para
                                              * alzar el evento HTTP_OK (COMM_CHANNEL_OK) y esperar WIFI_OK (COMM DISPATCHER_OK) */
     uint8_t *token;                         /* Token para comunicarse de forma segura con los servicios web */
 } ws_task_arg_t;
+
+typedef struct ws_msg_handler_arg_t {
+    QueueHandle_t out_queue;                /* Cola para recibir paquetes enviados por otros tasks */
+    QueueHandle_t ctrl_queue;               /* Cola para recibir mensajes de control */
+} ws_msg_handler_arg_t;
 
 /** Funciones **/
 token_ret_t http_send_token(uint8_t *token, const char *mac);
