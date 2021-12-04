@@ -193,12 +193,11 @@ void websocket_task(void *pvParameters) {
                      mvector_json, buffer, 
                      JSON_BUFFER_SIZE );
             ESP_LOGI(WSTASK_TAG, "Enviando mensaje al servidor...");
-            ESP_LOGI(WSTASK_TAG, "JSON:\n%s", buffer);
+            //ESP_LOGI(WSTASK_TAG, "JSON:\n%s", buffer);
             //ESP_LOGI(WSTASK_TAG, "JSON:\n%s", json_str);
             //ESP_LOG_BUFFER_HEX(WSTASK_TAG, json_str, strlen(json_str));
             esp_websocket_client_send_text(ws_client, buffer, strlen(buffer), portMAX_DELAY);
-        }
-        if (msg.type == MSG_STATUS_GENERIC) {
+        } else if (msg.type == MSG_STATUS_GENERIC) {
             ESP_LOGI(WSTASK_TAG, "MSG_STATUS_GENERIC");
             cJSON *msg_generic_json = get_generic_msg_json(msg.status.esp_status, msg.status.status);
             if ( msg_generic_json != NULL && 
@@ -435,7 +434,7 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
         cJSON_AddItemToObject(meas_obj, "type", type_str);
         cJSON *val = NULL;
         if ( mvector->data[i].type == HUMIDITY) {
-            float hum_perc = ( -200.0 * mvector->data[i].value * 0.001 ) / 3 + 161.333;
+            float hum_perc = ( -10000.0 * mvector->data[i].value * 0.001 + 20800 ) / 133;
             val = cJSON_CreateNumber(hum_perc); 
         } else if ( mvector->data[i].type == TEMPERATURE) {
             float temp_float = mvector->data[i].value * 0.1;

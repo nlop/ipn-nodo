@@ -37,7 +37,7 @@
 #endif
 #define WS_PING_INTERVAL    CONFIG_WEBSOCKET_PING_INT
 
-#define JSON_BUFFER_SIZE    256
+#define JSON_BUFFER_SIZE    384
 
 /** Tipos **/
 typedef void (*token_revc_cb_t)(uint8_t *token);
