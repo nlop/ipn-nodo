@@ -10,12 +10,14 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "nodo_def.h"
+#include "measure/measure_def.h"
 #include "nodo_events.h"
 #include "nodo_queue.h"
-#include "nodo_gattc.h"
-#include "nodo_mac.h"
-#include "nodo_spiffs.h"
-#include "measure_def.h"
+#include "nodo_bluetooth.h"
+#include "gatt/gattc.h"
+#include "utils/mac.h"
+#include "storage/spiffs.h"
+#include "storage/nodo_nvs.h"
 
 #if CONFIG_TSL2561_ENABLED 
 #include <tsl2561.h>
@@ -31,7 +33,6 @@
 #define MEASURE_RATE_MS     CONFIG_MEASURE_RATE_MS
 #define SAMPLES             CONFIG_SAMPLES
 #define DEFAULT_VREF        CONFIG_VREF
-#define MAX_GATTC_ATTEMPTS  15
 
 // Pines para comunicación I2C
 #if CONFIG_TSL2561_ENABLED || CONFIG_BH1750_ENABLED
@@ -51,7 +52,5 @@ typedef struct meas_task_arg_t {
 
 /** Funciones **/
 void measure_task(void *pvParameters);
-
-extern dev_type_t dev_type;
 
 #endif 

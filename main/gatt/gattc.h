@@ -17,27 +17,17 @@
 #include "esp_gatt_common_api.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
-#include "gatt_def.h"
+#include "gatt/gatt_def.h"
 #include "nodo_queue.h"
+#include "utils/mac.h"
 
 #define GATTC_TAG                   "NODO_GATTC"
 #define PROFILE_NUM                 1
 #define NODO_PROFILE_ID             0
 #define INVALID_HANDLE              0
-#define MAC_ADDR_LEN                6
 #define GATTC_SCAN_TIMEOUT          30                  /* Tiempo para escanear servidores BLE */
-#define GATTC_WAIT_START_TIMEOUT    3000
-/* TODO: Pasar a config ^^^^ */
-
-/* TODO: Concentrar UUIDs en esp_def.h */
-
-/** UUIDs importantes **/
-#define REMOTE_SERVICE_UUID         0x3931
-#define REMOTE_NOTIFY_CHAR_UUID     0xFF01
-#define TEMP_CHAR_UUID              0x2A6E
-#define TEST_DISCOVERY_UUID         0x2a23
-#define HUMIDITY_CHAR_UUID          0x2A6F
-#define LUX_CHAR_UUID               0x2AFB
+#define MAX_GATTC_ATTEMPTS          15
+#define GATTC_WAIT_START_TIMEOUT    CONFIG_GATTC_WAIT_START_TIMEOUT
 
 
 struct gattc_profile_inst {
@@ -71,13 +61,10 @@ typedef struct gattc_char_vec_t {
 typedef void (*gattc_discovery_cb_t) (nodo_gattc_events_t evt, void *arg);
 
 /** Funciones **/
-void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
-void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
-void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 int init_gatt_client(const QueueHandle_t queue);
-uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len);
 void gattc_set_addr(const uint8_t *raw_addr, const char *str_addr);
 int gattc_set_chars(const uint16_t *chars, uint8_t chars_len);
+void gattc_set_instance_id(const uint16_t inst_id);
 int nodo_gattc_start(void);
 int gattc_submit_chars(void);
 void register_discovery_cb(gattc_discovery_cb_t disco_cb);

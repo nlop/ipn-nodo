@@ -26,7 +26,11 @@ menu "IPN-NODO Menu"
                 menos MAX_CONNECT_ATTEMPTS veces para poder conseguir una direcicón IP. De lo
                 contrario, se notificará a la aplicación.
     endmenu
-
+    menu "Bluetooth - BLE"
+        config GATTC_WAIT_START_TIMEOUT
+        int "Timeouts para iniciar el cliente GATT (ms)"
+        default 3000
+    endmenu
     menu "Sensores"
         config MEASURE_RATE_MS
         int "Periodo para realizar medidas (ms)"

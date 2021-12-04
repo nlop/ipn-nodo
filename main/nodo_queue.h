@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 #include "nodo_wifi.h"
-#include "measure.h"
-#include "measure_def.h"
+#include "measure/measure_def.h"
 
 /** Message Queues **/
 #define SPP_QUEUE_LEN       CONFIG_SPP_QUEUE_LEN
@@ -40,6 +39,7 @@ enum ws_msg_type_t  {
 };
 
 enum ctrl_msg_type_t {
+    MSG_DEV_DISCOVERY,
     MSG_MEASURE_INST,
     MSG_MEASURE_PH,
 };
@@ -89,12 +89,22 @@ typedef struct ws_queue_msg_t {
     };
 } ws_queue_msg_t;
 
+typedef struct ctrl_msg_dev_discovery_t {
+    uint8_t *dev_addr;
+    uint16_t instance_id;
+} ctrl_msg_dev_discovery_t;
+
+typedef struct ctrl_msg_ {
+    uint8_t *dev_addr;
+} ctrl_msg_measure_t;
+
 typedef struct ctrl_msg_t {
     enum ctrl_msg_type_t type;
     union {
         /* Dirección para lectura instantanea (MSG_MEASURE_INST) de nodo remoto, 
          * si es NULL, leer sensores integrados */
-        uint8_t *remote_addr;       
+        ctrl_msg_dev_discovery_t discovery;
+        ctrl_msg_measure_t measure;
     };
 } ctrl_msg_t;
 

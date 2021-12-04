@@ -1,7 +1,5 @@
 #include "web/websocket.h"
 
-/* GATTC Init */
-static uint16_t const init_char[] = { TEST_DISCOVERY_UUID };
 
 static void ws_evt_handler_conn(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static void ws_evt_handler_data(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
@@ -152,52 +150,37 @@ static void ws_message_handler(cJSON *msg, ws_msg_handler_arg_t *args) {
             ESP_LOGE(WEBSOCK_TAG, "%s| Error parsing req-inst-data!", __func__);
             return;
         }
-        ctrl_msg_t ctrl_msg = {.type = MSG_MEASURE_INST, .remote_addr = NULL};  
+        ctrl_msg_t ctrl_msg = {.type = MSG_MEASURE_INST, .measure =  { .dev_addr = NULL } };  
         /* Notificar al control */
         xQueueSendToBack(args->ctrl_queue,&ctrl_msg, portMAX_DELAY);
     }
     /* TODO: Refactorizar a la parte de control en measure.c */
     if ( strcmp(msg_type->valuestring, "esp-dev-discovery") == 0 ) {
         uint8_t *addr;
-        /* Preparar el argumento para el callback */
-        cJSON *child = cJSON_GetObjectItem(content, "child");
-
-        if ( ( addr = parse_u8_array(child, ENTRY_LEN) ) == NULL ) {
+        cJSON *instance_id = cJSON_GetObjectItem(content, "instanceId");
+        if ( instance_id == NULL || instance_id->valueint == 0) {
+            ESP_LOGE(WEBSOCK_TAG, "%s| Error parsing instanceID!", __func__);
+            cJSON_Delete(instance_id);
             return;
         }
-        ESP_LOG_BUFFER_HEX(WEBSOCK_TAG, addr, ENTRY_LEN);
-        /* Habilitar el stack BT/BLE sí no esta habilitado */
-        if (dev_type == NODO_WIFI) {
-            //ESP_LOGI(WEBSOCK_TAG, "%s| Debería habilitar BT/BLE & iniciar GATTC...", __func__);
-            ESP_LOGI(WEBSOCK_TAG, "%s: Habilitando stack BT/BLE...", __func__);
-            if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
-                ESP_LOGE(WEBSOCK_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
-                return;
-            }
-            if (init_gatt_client(args->out_queue) != 0) {
-                ESP_LOGE(WEBSOCK_TAG, "%s: Error levantando cliente GATT!", __func__); 
-                return;
-            }
-            register_discovery_cb(gattc_ws_callback);
-            // TODO: Agregar str_addr para DISCOVERY_CMPL/FAIL
-            char *addr_str = (char *) calloc(MAC_STR_LEN + 1, sizeof(char));
-            get_mac_str(addr, addr_str);
-            gattc_set_addr(addr, addr_str);
-            if ( gattc_set_chars(init_char, sizeof(init_char)/sizeof(init_char[0])) != 0) {
-                ESP_LOGE(WEBSOCK_TAG, "%s: Error declarando chars!", __func__); 
-                return; 
-            }
-            for ( uint8_t i = 0; i < MAX_GATTC_ATTEMPTS; i++ ) {
-                int ret = nodo_gattc_start();
-                if ( ret != 0 ) {
-                    ESP_LOGE(MEAS_TAG, "%s GATTC reintento #%02d", __func__, i);
-                    vTaskDelay(pdMS_TO_TICKS(GATTC_WAIT_START_TIMEOUT));
-                } else {
-                    break;
-                }
-            }
-            free(addr_str);
+        cJSON *child = cJSON_GetObjectItem(content, "child");
+        if ( child == NULL ) {
+            ESP_LOGE(WEBSOCK_TAG, "%s| Error parsing child!", __func__);
+            cJSON_Delete(child);
+            cJSON_Delete(instance_id);
+            return;
         }
+        if ( ( addr = parse_u8_array(child, MAC_ADDR_LEN) ) == NULL ) {
+            return;
+        }
+        ESP_LOGI(WEBSOCK_TAG, "%s| Dirección hijo:", __func__);
+        ESP_LOG_BUFFER_HEX(WEBSOCK_TAG, addr, MAC_ADDR_LEN);
+        ctrl_msg_t ctrl_msg = {
+            .type = MSG_DEV_DISCOVERY, 
+            .discovery = { .dev_addr = addr, .instance_id = instance_id->valueint}
+        };  
+        /* Notificar al control */
+        xQueueSendToBack(args->ctrl_queue,&ctrl_msg, portMAX_DELAY);
         ESP_LOGI(WEBSOCK_TAG, "%s| Done!", __func__);
         // Discovery...
     } else {
@@ -205,56 +188,3 @@ static void ws_message_handler(cJSON *msg, ws_msg_handler_arg_t *args) {
     }
 }
 
-/* Callback enviado al proceso de inicialización de BLE */
-void gattc_ws_callback(nodo_gattc_events_t evt, void *arg) {
-    /* TODO: Emitir mensaje donde falla el proceso de descubrimiento
-     * |-> Parcialmente cubierto en nodo_gattc.h! */
-    if ( evt == DISCOVERY_CMPL ) {
-        /* Guardar en SPIFFS */
-        if ( ( dev_type == NODO_WIFI ) &&  ( spiffs_init() != 0 ) ) {
-            ESP_LOGE(WEBSOCK_TAG, "%s| Error inicializando almacenamiento SPIFFS!", __func__);
-            return;
-        }
-        if ( ( spiffs_mounted() != 0 ) && ( spiffs_mount() != 0 ) ) {
-            ESP_LOGE(WEBSOCK_TAG, "%s| Error montando SPIFFS!", __func__);
-            return;
-        }
-        if (spiffs_add_entry( (uint8_t *) arg ) != 0 ) {
-            ESP_LOGE(WEBSOCK_TAG, "%s| Error guardando entrada!", __func__);
-            return;
-        }
-        if ( ( dev_type == NODO_WIFI ) && ( nvs_set_mode(SINKNODE) != 0 ) ) {
-            ESP_LOGE(WEBSOCK_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
-        }
-        spiffs_umount();
-        vTaskDelay(pdMS_TO_TICKS(3000));
-        /* Reiniciar para inicializar con nuevo modo o leer de nuevo la lista y
-         * realizar la primera lectura */
-        esp_restart();
-        /* Ruta alternativa sin reinicio <<< Genera errores de ejecución >>> */
-        //gattc_db.len += 1;
-        //db_entry_t *ret = reallocarray(gattc_db.data, gattc_db.len, sizeof(db_entry_t));
-        //if ( ret == NULL )
-        //    ESP_LOGE(WEBSOCK_TAG, "%s| Error modificando gattc_db!", __func__);
-        //else
-        //    gattc_db.data = ret;
-        ///* Rellenar datos de la última estación agregada */
-        //uint8_t *tmp = (uint8_t *) calloc(MAC_BYTES, sizeof(uint8_t));
-        //if ( tmp != NULL ) {
-        //    memcpy(tmp, arg, MAC_BYTES);
-        //} else {
-        //    ESP_LOGE(WEBSOCK_TAG, "%s| Error alojando memoria para raw_addr!", __func__);
-        //    return;
-        //}
-        //gattc_db.data[gattc_db.len - 1].raw_addr = tmp;
-        //char *tmp_str = (char *) calloc(MAC_STR_LEN + 1, sizeof(char));
-        //get_mac_str(gattc_db.data[gattc_db.len - 1].raw_addr, tmp_str);
-        //gattc_db.data[gattc_db.len - 1].str_addr = tmp_str;
-        ///* Establecer los parámetros de lectura para GATTC */
-        //if ( gattc_set_chars(chars, sizeof(chars)/sizeof(chars[0])) != 0) {
-        //    ESP_LOGE(WEBSOCK_TAG, "%s: Error declarando chars!", __func__); 
-        //    return; 
-        //}
-        unregister_discovery_cb();
-    }
-}

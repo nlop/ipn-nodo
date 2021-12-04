@@ -13,6 +13,7 @@
 #include "esp_gatts_api.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
+#include "gatt/gatt_def.h"
 #include "nodo_events.h"
 #include "nodo_queue.h"
 
@@ -42,11 +43,11 @@ static uint8_t service_uuid[16] = {
 };
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 /* Valores asignados por Bluetooth SIG */
-static const uint16_t temperature_uuid = 0x2A6E;        // SIG GATT Characteristics and Object Type
-static const uint16_t humidity_uuid= 0x2A6F; 
-static const uint16_t lux_uuid = 0x2AFB;
-static const uint16_t generic_uuid = 0x2AF9;
-static const uint16_t system_id_uuid = 0x2a23;
+static const uint16_t temperature_uuid = TEMP_CHAR_UUID;        // SIG GATT Characteristics and Object Type
+static const uint16_t humidity_uuid= HUMIDITY_CHAR_UUID; 
+static const uint16_t lux_uuid = LUX_CHAR_UUID;
+static const uint16_t generic_uuid = 0x2AF9; // pH
+static const uint16_t system_id_uuid = TEST_DISCOVERY_UUID;
 /* Characteristics formats (<<< LSB ----- MSB >>>) */
 static const uint8_t temp_presentation_format[7] =  {0x10, -1, 0x2f, 0x27, 0x01, 0x00, 0x00};
 static const uint8_t hum_presentation_format[7] =   {0x10, -3, 0x28, 0x27, 0x01, 0x00, 0x00};
@@ -222,54 +223,10 @@ static const esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
             }}
 };
 
-/* The length of adv data must be less than 31 bytes */
-static esp_ble_adv_data_t adv_data = {
-    .set_scan_rsp        = false,
-    .include_name        = true,
-    .include_txpower     = true,
-    .min_interval        = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
-    .max_interval        = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
-    .appearance          = DEV_BLE_APPEARANCE,
-    .manufacturer_len    = 0,    //TEST_MANUFACTURER_DATA_LEN,
-    .p_manufacturer_data = NULL, //test_manufacturer,
-    .service_data_len    = 0,
-    .p_service_data      = NULL,
-    .service_uuid_len    = sizeof(service_uuid),
-    .p_service_uuid      = service_uuid,
-    .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
-};
 
-// scan response data
-static esp_ble_adv_data_t scan_rsp_data = {
-    .set_scan_rsp        = true,
-    .include_name        = true,
-    .include_txpower     = true,
-    .min_interval        = 0x0006,
-    .max_interval        = 0x0010,
-    .appearance          = DEV_BLE_APPEARANCE,
-    .manufacturer_len    = 0, //TEST_MANUFACTURER_DATA_LEN,
-    .p_manufacturer_data = NULL, //&test_manufacturer[0],
-    .service_data_len    = 0,
-    .p_service_data      = NULL,
-    .service_uuid_len    = sizeof(service_uuid),
-    .p_service_uuid      = service_uuid,
-    .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
-};
-
-static esp_ble_adv_params_t adv_params = {
-    .adv_int_min         = 0x20,
-    .adv_int_max         = 0x40,
-    .adv_type            = ADV_TYPE_IND,
-    .own_addr_type       = BLE_ADDR_TYPE_PUBLIC,
-    .channel_map         = ADV_CHNL_ALL,
-    .adv_filter_policy   = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
-};
 
 /* Funciones */
 void init_gatt_server(const EventGroupHandle_t evt_group);
-void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
-void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
-void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 void gatt_task(void *pvParameters);
 
 /* Estructuras */

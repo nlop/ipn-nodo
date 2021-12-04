@@ -1,4 +1,4 @@
-#include "measure.h"
+#include "measure/measure.h"
 /* TODO:
  *      + Revisar la atenuación de los ADCs dependiendo de los máximos de entrada para cada
  *      dispositivo
@@ -7,6 +7,15 @@
  *
  */
 
+enum meas_type_t { INSTANT, NORMAL };
+
+/** Funciones locales **/
+static int measure(enum meas_type_t type, QueueHandle_t out_queue);
+static int sinknode_measure(spiffs_db_t *gattc_db);
+static int init_measure_(void);
+static void control(ctrl_msg_t msg, meas_task_arg_t *ctx);
+static void gattc_init_callback(nodo_gattc_events_t evt, void *arg);
+static int dev_discovery(uint8_t *addr, uint16_t instance_id, QueueHandle_t queue);
 
 static esp_adc_cal_characteristics_t *adc1_ch6_chars, *adc1_ch7_chars;
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
@@ -22,11 +31,8 @@ static tsl2561_t dev;
 static i2c_dev_t dev;
 #endif
 
-enum meas_type_t { INSTANT, NORMAL };
-
-static int measure(enum meas_type_t type, QueueHandle_t out_queue);
-static int sinknode_measure(spiffs_db_t *gattc_db);
-static int init_measure_(void);
+extern dev_type_t dev_type;
+extern spiffs_db_t gattc_db;
 
 void measure_task(void *pvParameters) {
     static BaseType_t queue_ret;
@@ -48,13 +54,7 @@ void measure_task(void *pvParameters) {
             queue_ret = xQueueReceive(arg->ctrl_queue , &ctrl_msg ,pdMS_TO_TICKS(MEASURE_RATE_MS));
             if ( queue_ret == pdPASS ) {
                 /* TODO: Lógica de mensajes */
-                if ( ctrl_msg.type == MSG_MEASURE_INST ) {
-                    if ( ctrl_msg.remote_addr == NULL ) {
-                        measure(INSTANT, arg->out_queue);
-                    } else {
-                        // TODO: Revisar remote_addr guardado en gattc_db
-                    }
-                }
+                control(ctrl_msg, arg);
             } else {
                 /* TODO: Si acaba MEASURE_RATE_MS y no hay msg, realizar mediciones */
                 measure(NORMAL, arg->out_queue);
@@ -102,6 +102,119 @@ static int init_measure_(void) {
     adc1_ch7_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, width, DEFAULT_VREF, adc1_ch7_chars);
     return 0;
+}
+
+static void control(ctrl_msg_t msg, meas_task_arg_t *ctx) {
+    if ( msg.type == MSG_MEASURE_INST ) {
+        if ( msg.measure.dev_addr == NULL ) {
+            measure(INSTANT, ctx->out_queue);
+        } else {
+            // TODO: Revisar remote_addr guardado en gattc_db
+        }
+    } else if (msg.type == MSG_MEASURE_PH) {
+        // TODO: Habilitar y leer el sensor de pH
+        ESP_LOGW(MEAS_TAG, "%s| Sensor de pH (TODO)!", __func__);
+    } else if (msg.type == MSG_DEV_DISCOVERY) {
+        dev_discovery(msg.discovery.dev_addr, msg.discovery.instance_id, ctx->out_queue);
+    } else {
+        ESP_LOGE(MEAS_TAG, "%s| Tipo de mensaje desconocido!", __func__);
+    }
+}
+
+static int dev_discovery(uint8_t *addr, uint16_t instance_id, QueueHandle_t queue) {
+    /* GATTC Init */
+    uint16_t const init_char[] = { TEST_DISCOVERY_UUID };
+    /* Habilitar el stack BT/BLE sí no esta habilitado */
+    if (dev_type == NODO_WIFI) {
+        //ESP_LOGI(MEAS_TAG, "%s| Debería habilitar BT/BLE & iniciar GATTC...", __func__);
+        ESP_LOGI(MEAS_TAG, "%s: Habilitando stack BT/BLE...", __func__);
+        if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
+            ESP_LOGE(MEAS_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
+            return -1;
+        }
+        if (init_gatt_client(queue) != 0) {
+            ESP_LOGE(MEAS_TAG, "%s: Error levantando cliente GATT!", __func__); 
+            return -1;
+        }
+    }
+    register_discovery_cb(gattc_init_callback);
+    // TODO: Agregar str_addr para DISCOVERY_CMPL/FAIL
+    char *addr_str = (char *) calloc(MAC_STR_LEN + 1, sizeof(char));
+    get_mac_str(addr, addr_str);
+    gattc_set_addr(addr, addr_str);
+    if ( gattc_set_chars(init_char, sizeof(init_char)/sizeof(init_char[0])) != 0) {
+        ESP_LOGE(MEAS_TAG, "%s: Error declarando chars!", __func__); 
+        return -1; 
+    }
+    for ( uint8_t i = 0; i < MAX_GATTC_ATTEMPTS; i++ ) {
+        int ret = nodo_gattc_start();
+        if ( ret != 0 ) {
+            ESP_LOGE(MEAS_TAG, "%s GATTC reintento #%02d", __func__, i);
+            vTaskDelay(pdMS_TO_TICKS(GATTC_WAIT_START_TIMEOUT));
+        } else {
+            break;
+        }
+        if ( i == MAX_GATTC_ATTEMPTS - 1 && ret != 0 ) {
+            ESP_LOGE(MEAS_TAG, "%s| Error iniciando cliente GATT", __func__);
+            return -1;
+        }
+    }
+    free(addr_str);
+    return 0;
+}
+
+/* Callback enviado al proceso de inicialización de BLE */
+static void gattc_init_callback(nodo_gattc_events_t evt, void *arg) {
+    /* TODO: Emitir mensaje donde falla el proceso de descubrimiento
+     * |-> Parcialmente cubierto en nodo_gattc.h! */
+    if ( evt == DISCOVERY_CMPL ) {
+        /* Guardar en SPIFFS */
+        if ( ( dev_type == NODO_WIFI ) &&  ( spiffs_init() != 0 ) ) {
+            ESP_LOGE(MEAS_TAG, "%s| Error inicializando almacenamiento SPIFFS!", __func__);
+            return;
+        }
+        if ( ( spiffs_mounted() != 0 ) && ( spiffs_mount() != 0 ) ) {
+            ESP_LOGE(MEAS_TAG, "%s| Error montando SPIFFS!", __func__);
+            return;
+        }
+        if (spiffs_add_entry( (uint8_t *) arg ) != 0 ) {
+            ESP_LOGE(MEAS_TAG, "%s| Error guardando entrada!", __func__);
+            return;
+        }
+        if ( ( dev_type == NODO_WIFI ) && ( nvs_set_mode(SINKNODE) != 0 ) ) {
+            ESP_LOGE(MEAS_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
+        }
+        spiffs_umount();
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        /* Reiniciar para inicializar con nuevo modo o leer de nuevo la lista y
+         * realizar la primera lectura */
+        esp_restart();
+        /* Ruta alternativa sin reinicio <<< Genera errores de ejecución >>> */
+        //gattc_db.len += 1;
+        //db_entry_t *ret = reallocarray(gattc_db.data, gattc_db.len, sizeof(db_entry_t));
+        //if ( ret == NULL )
+        //    ESP_LOGE(MEAS_TAG, "%s| Error modificando gattc_db!", __func__);
+        //else
+        //    gattc_db.data = ret;
+        ///* Rellenar datos de la última estación agregada */
+        //uint8_t *tmp = (uint8_t *) calloc(MAC_ADDR_LEN, sizeof(uint8_t));
+        //if ( tmp != NULL ) {
+        //    memcpy(tmp, arg, MAC_ADDR_LEN);
+        //} else {
+        //    ESP_LOGE(MEAS_TAG, "%s| Error alojando memoria para raw_addr!", __func__);
+        //    return;
+        //}
+        //gattc_db.data[gattc_db.len - 1].raw_addr = tmp;
+        //char *tmp_str = (char *) calloc(MAC_STR_LEN + 1, sizeof(char));
+        //get_mac_str(gattc_db.data[gattc_db.len - 1].raw_addr, tmp_str);
+        //gattc_db.data[gattc_db.len - 1].str_addr = tmp_str;
+        ///* Establecer los parámetros de lectura para GATTC */
+        //if ( gattc_set_chars(chars, sizeof(chars)/sizeof(chars[0])) != 0) {
+        //    ESP_LOGE(MEAS_TAG, "%s: Error declarando chars!", __func__); 
+        //    return; 
+        //}
+        unregister_discovery_cb();
+    }
 }
 
 static int measure(enum meas_type_t type, QueueHandle_t out_queue) {

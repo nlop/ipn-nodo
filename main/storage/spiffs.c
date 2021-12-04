@@ -1,4 +1,4 @@
-#include "nodo_spiffs.h"
+#include "storage/spiffs.h"
 
 /*
  * Archivo para almacenar las estaciones asociadas a un sinknode

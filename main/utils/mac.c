@@ -1,4 +1,4 @@
-#include "nodo_mac.h"
+#include "utils/mac.h"
 
 char mac_nodo_str[32];
 static bool mac_ready = false;
@@ -20,17 +20,17 @@ const char *nodo_get_mac() {
 /*
  * Obtener la cadena que representa la dirección MAC en formato legible
  * a partir de los bytes almacenados en src, de los cuales se leen solamente
- * MAC_BYTES. La cadena es alojada en el puntero dest
+ * MAC_ADDR_LEN. La cadena es alojada en el puntero dest
  * Argumentos:
  *      src: Puntero donde estan almacenados los bytes de la dirección MAC
  *      dest: Puntero donde se almacenará la cadena creada
  */
 void get_mac_str(const uint8_t *src, char *dest) {
     char tmp[8];
-    for(uint8_t i = 0; i < MAC_BYTES; i++) {
+    for(uint8_t i = 0; i < MAC_ADDR_LEN; i++) {
         sprintf((char *) &tmp, "%02hx:", src[i]);
         memcpy(dest + i * 3, &tmp, 3 * sizeof(uint8_t));
     }
     /* Eliminar los dos puntos ':' del último bloque*/
-    dest[MAC_BYTES * 3 - 1] = '\0';
+    dest[MAC_ADDR_LEN * 3 - 1] = '\0';
 }

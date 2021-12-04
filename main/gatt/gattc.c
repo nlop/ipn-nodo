@@ -1,19 +1,15 @@
-#include "nodo_gattc.h"
+#include "gatt/gattc.h"
+
+/** Funciones locales **/
+static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
+static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
+static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
+static uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len);
 
 /* GATT Server char UUIDs */
 static esp_bt_uuid_t remote_filter_service_uuid = {
     .len = ESP_UUID_LEN_16,
     .uuid = {.uuid16 =  REMOTE_SERVICE_UUID,},
-};
-
-static esp_bt_uuid_t test_discovery_uuid = {
-    .len = ESP_UUID_LEN_16,
-    .uuid = {.uuid16 =  TEST_DISCOVERY_UUID,},
-};
-
-static esp_bt_uuid_t temperature_char_uuid = {
-    .len = ESP_UUID_LEN_16,
-    .uuid = {.uuid16 = TEMP_CHAR_UUID,},
 };
 
 static esp_ble_scan_params_t ble_scan_params = {
@@ -25,15 +21,16 @@ static esp_ble_scan_params_t ble_scan_params = {
     .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
 
-static uint8_t child_addr [MAC_BYTES];
+static uint8_t child_addr [MAC_ADDR_LEN];
 static char child_addr_str [MAC_STR_LEN + 1];
+static uint16_t instance_id = 0;
 static bool client_init_ok = false;
 static bool connect    = false;
 static bool get_server = false;
 static gattc_discovery_cb_t discovery_cb = NULL;
 // void *discovery_cb_arg;
 /* Cola para enviar datos (ws) */
-QueueHandle_t out_queue;
+static QueueHandle_t out_queue;
 /* Arreglo de estructuras con datos de las características */
 static gattc_char_vec_t server_chars = { .chars = NULL, .len = 0 };
 /* Variables para measure_vector */
@@ -41,7 +38,6 @@ static measure_t measure_data[3];
 static measure_vector_t meas_vec = {.data = measure_data, .len = 3, .dev_addr = "GATTS_NODE_ADDR" };
 /* Contenedor para mensajes al ws */
 static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR_NORM, .meas_vector = &meas_vec };
-extern TaskHandle_t ws_task_handle;
 
 /* TODO: reducir ESP_LOGIs del módulo */
 
@@ -54,7 +50,7 @@ struct gattc_profile_inst gl_profile_tab[PROFILE_NUM] = {
     },
 };
 
-void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
+static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
 {
     esp_ble_gattc_cb_param_t *p_data = (esp_ble_gattc_cb_param_t *)param;
     static uint8_t read_chars = 0;
@@ -219,7 +215,7 @@ void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc
     }
 }
 
-void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
+static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
     switch (event) {
     case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
@@ -293,7 +289,7 @@ void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
     }
 }
 
-void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
+static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
 {
     /* If event is register event, store the gattc_if for each profile */
     if (event == ESP_GATTC_REG_EVT) {
@@ -349,9 +345,13 @@ int init_gatt_client(const QueueHandle_t queue) {
     return 0;
 }
 
+void gattc_set_instance_id(const uint16_t inst_id) {
+    instance_id = inst_id;
+}
+
 void gattc_set_addr(const uint8_t *raw_addr, const char *str_addr) {
     /* Guardar la dirección del nodo hijo (raw) */
-    memcpy(child_addr, raw_addr, MAC_BYTES);
+    memcpy(child_addr, raw_addr, MAC_ADDR_LEN);
     ESP_LOGI(GATTC_TAG, "%s| Declarando dirección (raw)...", __func__);
     ESP_LOG_BUFFER_HEX(GATTC_TAG, child_addr, MAC_ADDR_LEN);
     /* Guardar la dirección del nodo hijo (cadena) */
@@ -399,7 +399,7 @@ int nodo_gattc_start(void) {
 }
 
 /* Convertir los primeros dos bytes de un arreglo entero s/signo de 16b */
-uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
+static uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
     return len >= 2 ? ( ( ( 0L | bytes[1] ) << 8 ) | bytes[0] ) : 0;
 }
 
@@ -408,16 +408,18 @@ int gattc_submit_chars(void) {
     if ( server_chars.len == 1 
             && server_chars.chars[0].uuid.uuid.uuid16 == TEST_DISCOVERY_UUID ) {
         ESP_LOGW(GATTC_TAG, "%s| DISCOVERY_CMPL", __func__); 
-        // TODO: Comparar con arg del WS
-        // Enviar mensaje DISCOVERY_CMPL
-        //ws_queue_msg_t msg = {
-        //    .type = MSG_STATUS_GENERIC,
-        //    .status = { .esp_status = ESP_OK, .status = DISCOVERY_CMPL, }
-        //};
+        /* Verificar instance ID */
+        if ( server_chars.chars[0].value != instance_id ) {
+            ESP_LOGE(GATTC_TAG, "%s| Error verificando Instace ID!", __func__);
+        }
+        /* Enviar mensaje DISCOVERY_CMPL */
         ws_msg.type = MSG_STATUS_GENERIC;
         ws_msg.status.esp_status = ESP_OK;
         ws_msg.status.status = DISCOVERY_CMPL;
         if ( discovery_cb != NULL ) { discovery_cb(DISCOVERY_CMPL, child_addr); }
+        memset(child_addr, 0, sizeof(child_addr)/sizeof(child_addr[0]));
+        memset(child_addr_str, 0, sizeof(child_addr_str)/sizeof(child_addr_str[0]));
+        instance_id = 0;
     } else {
         ESP_LOGW(GATTC_TAG, "%s| MEAS_MSG", __func__); 
         if ( server_chars.len > meas_vec.len ) {

@@ -1,4 +1,9 @@
-#include "nodo_gatts.h"
+#include "gatt/gatts.h"
+
+/** Funciones locales **/
+static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 
 /* Campo de control para rastrear la configuración del Advertisement y
  * Response. Dado que al registrar las dos configuraciones, se lanza un evento
@@ -14,6 +19,49 @@ static uint8_t adv_config_done = 0;
  */
 uint16_t nodo_service_handles[DB_LEN];
 
+static esp_ble_adv_params_t adv_params = {
+    .adv_int_min         = 0x20,
+    .adv_int_max         = 0x40,
+    .adv_type            = ADV_TYPE_IND,
+    .own_addr_type       = BLE_ADDR_TYPE_PUBLIC,
+    .channel_map         = ADV_CHNL_ALL,
+    .adv_filter_policy   = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+};
+
+/* The length of adv data must be less than 31 bytes */
+static esp_ble_adv_data_t adv_data = {
+    .set_scan_rsp        = false,
+    .include_name        = true,
+    .include_txpower     = true,
+    .min_interval        = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
+    .max_interval        = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
+    .appearance          = DEV_BLE_APPEARANCE,
+    .manufacturer_len    = 0,    //TEST_MANUFACTURER_DATA_LEN,
+    .p_manufacturer_data = NULL, //test_manufacturer,
+    .service_data_len    = 0,
+    .p_service_data      = NULL,
+    .service_uuid_len    = sizeof(service_uuid),
+    .p_service_uuid      = service_uuid,
+    .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
+};
+
+// scan response data
+static esp_ble_adv_data_t scan_rsp_data = {
+    .set_scan_rsp        = true,
+    .include_name        = true,
+    .include_txpower     = true,
+    .min_interval        = 0x0006,
+    .max_interval        = 0x0010,
+    .appearance          = DEV_BLE_APPEARANCE,
+    .manufacturer_len    = 0, //TEST_MANUFACTURER_DATA_LEN,
+    .p_manufacturer_data = NULL, //&test_manufacturer[0],
+    .service_data_len    = 0,
+    .p_service_data      = NULL,
+    .service_uuid_len    = sizeof(service_uuid),
+    .p_service_uuid      = service_uuid,
+    .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
+};
+
 /*
  * Instancia del servicio GATT, al lanzar el evento ESP_GATTS_REG_EVT se asigna
  * la interfaz del servicio
@@ -28,7 +76,7 @@ static struct gatts_profile_inst nodo_service_profile_tab[PROFILE_NUM] = {
 /* Handle para el grupo de eventos del nodo */
 static EventGroupHandle_t nodo_evt_group_handle;
 
-void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
+static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
     switch (event) {
         case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
@@ -73,7 +121,7 @@ void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
     }
 }
 
-void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
+static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
     switch (event) {
         case ESP_GATTS_REG_EVT:{
@@ -175,7 +223,7 @@ void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts
 }
 
 
-void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
+static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
     /* If event is register event, store the gatts_if for each profile */
     if (event == ESP_GATTS_REG_EVT) {

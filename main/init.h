@@ -10,10 +10,10 @@
 #include "nodo_queue.h"
 #include "nodo_wifi.h"
 #include "nodo_bluetooth.h"
-#include "nodo_gatts.h"
+#include "gatt/gatts.h"
 #include "nodo_events.h"
-#include "nodo_nvs.h"
-#include "nodo_mac.h"
+#include "storage/nodo_nvs.h"
+#include "utils/mac.h"
 #include "nodo_def.h"
 #include "web/http.h"
 

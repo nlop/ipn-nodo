@@ -5,8 +5,8 @@
 #include "cJSON.h"
 #include "esp_err.h"
 #include "utils/time.h"
-#include "measure_def.h"
-#include "gatt_def.h"
+#include "measure/measure_def.h"
+#include "gatt/gatt_def.h"
 
 #define JSON_TAG    "JSON"
 

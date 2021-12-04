@@ -12,7 +12,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "nodo_queue.h"
-#include "nodo_gatts.h"
+#include "gatt/gatts.h"
 
 #define BT_TAG          "NODO BLUETOOTH"
 #define BT_DEVICE_NAME  "IPN-NODO"

@@ -1,5 +1,5 @@
-#ifndef NODO_SPIFFS_H
-#define NODO_SPIFFS_H
+#ifndef STORAGE_SPIFFS_H
+#define STORAGE_SPIFFS_H
 
 #include <stdio.h>
 #include "esp_spiffs.h"

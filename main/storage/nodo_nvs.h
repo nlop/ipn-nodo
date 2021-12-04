@@ -1,11 +1,11 @@
-#ifndef NODO_NVS_H
-#define NODO_NVS_H
+#ifndef STORAGE_NVS_H
+#define STORAGE_NVS_H
 
 #include <stdlib.h>
-#include "nvs.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "nodo_def.h"
+#include "nvs.h"
 
 #define NVS_TAG             "NODO-NVS"
 #define AP_NAMESPACE        "AP_NS"             // Particion en la NVS para guardar info. sobre el punto de acceso WiFi

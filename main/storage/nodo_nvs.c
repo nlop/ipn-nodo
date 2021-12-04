@@ -1,4 +1,4 @@
-#include "nodo_nvs.h"
+#include "storage/nodo_nvs.h"
 
 /*
  * Guardar las credenciales (SSID/PSK) para la conexión WiFi del dispositivo
