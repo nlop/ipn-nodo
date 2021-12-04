@@ -164,7 +164,7 @@ void send_init_token(uint8_t *token) {
     token_ret_t ret = http_send_token(token, mac_addr);
     if (ret.esp_status == ESP_OK && ret.http_status == 200) {
         msg.type = MSG_SERV_CONN_OK;
-        ESP_LOGI(WEB_TAG, "Conexión con servidor exitosa!");
+        ESP_LOGI(INIT_TAG, "Conexión con servidor exitosa!");
         //ESP_LOGI(WEB_TAG, "Token: %s [len = %zu]", ret.token, ret.token_len);
         /* Sacar token de JSON obj */
         cJSON *token_json = cJSON_ParseWithLength( (char *) ret.token, ret.token_len);
@@ -185,7 +185,7 @@ void send_init_token(uint8_t *token) {
             ESP_LOGE(INIT_TAG, "%s| Error parsing token_json", __func__);
         }
     } else {
-        ESP_LOGI(WEB_TAG, "Conexión con servidor falló!");
+        ESP_LOGI(INIT_TAG, "Conexión con servidor falló!");
         msg.type = MSG_SERV_CONN_FAIL;
     }
     xQueueSendToBack(queue_out, &msg, portMAX_DELAY);

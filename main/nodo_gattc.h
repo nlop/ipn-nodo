@@ -17,6 +17,7 @@
 #include "esp_gatt_common_api.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "gatt_def.h"
 #include "nodo_queue.h"
 
 #define GATTC_TAG                   "NODO_GATTC"
@@ -37,10 +38,6 @@
 #define TEST_DISCOVERY_UUID         0x2a23
 #define HUMIDITY_CHAR_UUID          0x2A6F
 #define LUX_CHAR_UUID               0x2AFB
-
-
-/** Enums **/
-typedef enum {DISCOVERY_CMPL} nodo_gattc_events_t;
 
 
 struct gattc_profile_inst {
@@ -78,7 +75,6 @@ void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 int init_gatt_client(const QueueHandle_t queue);
-const char *nodo_gattc_event_to_name(nodo_gattc_events_t evt);
 uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len);
 void gattc_set_addr(const uint8_t *raw_addr, const char *str_addr);
 int gattc_set_chars(const uint16_t *chars, uint8_t chars_len);

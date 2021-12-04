@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "nodo_wifi.h"
 #include "measure.h"
+#include "measure_def.h"
 
 /** Message Queues **/
 #define SPP_QUEUE_LEN       CONFIG_SPP_QUEUE_LEN
@@ -79,21 +80,6 @@ typedef struct ws_status_generic {
     uint8_t status;
     esp_err_t esp_status;
 } ws_status_generic;
-
-/** Enums **/
-enum measure_type_t { TEMPERATURE, HUMIDITY, PH, LIGHT };
-
-typedef struct measure_t {
-    enum measure_type_t type; 
-    uint16_t value;
-} measure_t;
-
-typedef struct measure_vector_t {
-    uint8_t len;
-    struct measure_t *data;
-    const char *dev_addr;
-} measure_vector_t;
-
 
 typedef struct ws_queue_msg_t {
     enum ws_msg_type_t type;

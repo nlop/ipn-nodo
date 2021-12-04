@@ -6,13 +6,13 @@
 #include "esp_pm.h"
 #include "init.h"
 #include "nodo_nvs.h"
-#include "nodo_web.h"
 #include "measure.h"
 #include "esp_sntp.h"
 #include "nodo_mac.h"
 #include "nodo_gatts.h"
 #include "nodo_gattc.h"
 #include "nodo_spiffs.h"
+#include "web/websocket.h"
 
 #define MAIN_TAG "MAIN"
 #define GATT_MODE   true
@@ -242,7 +242,7 @@ void start_notify_connected_cb(EventGroupHandle_t evt_group, bool connected) {
 
 int load_gattc_db(void) {
     if ( ( spiffs_mounted() != 0 ) && ( spiffs_mount() != 0 ) ) {
-        ESP_LOGE(WSTASK_TAG, "%s| Error montando SPIFFS!", __func__);
+        ESP_LOGE(MAIN_TAG, "%s| Error montando SPIFFS!", __func__);
         return -1;
     } else {
         int ret = spiffs_get_all(&gattc_db);

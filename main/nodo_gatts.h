@@ -1,6 +1,7 @@
 #ifndef NODO_GATTS_H
 #define NODO_GATTS_H
 
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -12,7 +13,6 @@
 #include "esp_gatts_api.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
-#include <string.h>
 #include "nodo_events.h"
 #include "nodo_queue.h"
 

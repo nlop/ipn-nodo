@@ -398,15 +398,6 @@ int nodo_gattc_start(void) {
     return 0;
 }
 
-const char *nodo_gattc_event_to_name(nodo_gattc_events_t evt) {
-    switch (evt) {
-        case DISCOVERY_CMPL: 
-            return "discovery-cmpl";
-            break;
-    }
-    return NULL;
-}
-
 /* Convertir los primeros dos bytes de un arreglo entero s/signo de 16b */
 uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
     return len >= 2 ? ( ( ( 0L | bytes[1] ) << 8 ) | bytes[0] ) : 0;

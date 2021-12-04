@@ -175,21 +175,3 @@ static int sinknode_measure(spiffs_db_t *gattc_db) {
     }
     return 0;
 }
-/*
- * Función auxiliar para obtener la etiqueta de cada tipo de medición (utilizada para
- * generar entradas de JSON)
- */
-char *get_measure_str(uint8_t type) {
-    switch(type) {
-        case TEMPERATURE:
-            return "temperature";
-        case HUMIDITY:
-            return "humidity";
-        case LIGHT:
-            return "luminosity";
-        case PH:
-            return "ph";
-        default:
-            return NULL;
-    }
-}

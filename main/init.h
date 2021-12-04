@@ -11,11 +11,11 @@
 #include "nodo_wifi.h"
 #include "nodo_bluetooth.h"
 #include "nodo_gatts.h"
-#include "nodo_web.h"
 #include "nodo_events.h"
 #include "nodo_nvs.h"
 #include "nodo_mac.h"
 #include "nodo_def.h"
+#include "web/http.h"
 
 
 #define INIT_TAG        "NODO INIT"

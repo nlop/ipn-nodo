@@ -15,6 +15,7 @@
 #include "nodo_gattc.h"
 #include "nodo_mac.h"
 #include "nodo_spiffs.h"
+#include "measure_def.h"
 
 #if CONFIG_TSL2561_ENABLED 
 #include <tsl2561.h>
@@ -50,7 +51,6 @@ typedef struct meas_task_arg_t {
 
 /** Funciones **/
 void measure_task(void *pvParameters);
-char *get_measure_str(uint8_t type);
 
 extern dev_type_t dev_type;
 
