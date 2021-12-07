@@ -100,7 +100,7 @@ typedef struct ctrl_msg_dev_discovery_t {
 } ctrl_msg_dev_discovery_t;
 
 typedef struct ctrl_msg_ {
-    uint8_t *dev_addr;
+    const char *dev_addr;
 } ctrl_msg_measure_t;
 
 typedef struct ctrl_msg_t {

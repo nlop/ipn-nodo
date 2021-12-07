@@ -106,10 +106,11 @@ static int init_measure_(void) {
 
 static void control(ctrl_msg_t msg, meas_task_arg_t *ctx) {
     if ( msg.type == MSG_MEASURE_INST ) {
-        if ( msg.measure.dev_addr == NULL ) {
+        if ( strcmp(msg.measure.dev_addr, nodo_get_mac()) == 0 ) {
             measure(INSTANT, ctx->out_queue);
         } else {
             // TODO: Revisar remote_addr guardado en gattc_db
+            ESP_LOGW(MEAS_TAG, "TODO: Lecturas GATT");
         }
     } else if (msg.type == MSG_MEASURE_PH) {
         // TODO: Habilitar y leer el sensor de pH

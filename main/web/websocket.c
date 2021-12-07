@@ -138,24 +138,24 @@ static void ws_message_handler(cJSON *msg, ws_msg_handler_arg_t *args) {
         ESP_LOGE(WEBSOCK_TAG, "%s: Error parsing type", __func__);
         return; 
     }
-    cJSON *content = cJSON_GetObjectItem(msg, "content");
-    if (!cJSON_IsObject(content)) {
-        ESP_LOGE(WEBSOCK_TAG, "%s: Error parsing content", __func__);
-        return; 
-    }
-    if ( strcmp(msg_type->valuestring, "req-inst-data") == 0 ) {
+    if ( strcmp(msg_type->valuestring, "live-data") == 0 ) {
         /* Preparar el argumento para el callback */
-        cJSON *child = cJSON_GetObjectItem(content, "devAddr");
-        if ( child == NULL ) {
-            ESP_LOGE(WEBSOCK_TAG, "%s| Error parsing req-inst-data!", __func__);
+        cJSON *dev_addr = cJSON_GetObjectItem(msg, "devAddr");
+        if ( dev_addr == NULL ) {
+            ESP_LOGE(WEBSOCK_TAG, "%s| Error parsing live-data!", __func__);
             return;
         }
-        ctrl_msg_t ctrl_msg = {.type = MSG_MEASURE_INST, .measure =  { .dev_addr = NULL } };  
+        ctrl_msg_t ctrl_msg = {.type = MSG_MEASURE_INST, .measure =  { .dev_addr = dev_addr->valuestring }};
         /* Notificar al control */
         xQueueSendToBack(args->ctrl_queue,&ctrl_msg, portMAX_DELAY);
     }
     /* TODO: Refactorizar a la parte de control en measure.c */
-    if ( strcmp(msg_type->valuestring, "esp-dev-discovery") == 0 ) {
+    if ( strcmp(msg_type->valuestring, "dev-discovery") == 0 ) {
+        cJSON *content = cJSON_GetObjectItem(msg, "content");
+        if (!cJSON_IsObject(content)) {
+            ESP_LOGE(WEBSOCK_TAG, "%s: Error parsing content", __func__);
+            return; 
+        }
         uint8_t *addr;
         cJSON *instance_id = cJSON_GetObjectItem(content, "instanceId");
         if ( instance_id == NULL || instance_id->valueint == 0) {

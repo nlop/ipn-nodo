@@ -22,28 +22,7 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
         return NULL;
     }
     cJSON_AddItemToObject(json_obj, "timestamp", timestamp_val);
-    cJSON *meas_array = cJSON_CreateArray();
-    if ( meas_array == NULL ) {
-        ESP_LOGE(JSON_TAG, "%s| Error creando objeto JSON:measArray!", __func__);
-        cJSON_Delete(json_obj);
-        cJSON_Delete(timestamp_val);
-        free(timestamp);
-        return NULL;
-    }
-    cJSON_AddItemToObject(json_obj, "measurements", meas_array);
     for(uint8_t i = 0; i < mvector->len; i++) {
-        cJSON *meas_obj = cJSON_CreateObject();
-        if ( meas_obj == NULL ) {
-            ESP_LOGE(JSON_TAG, "%s| Error creando objeto JSON:measObj!", __func__);
-            cJSON_Delete(meas_array);
-            cJSON_Delete(json_obj);
-            cJSON_Delete(timestamp_val);
-            free(timestamp);
-            return NULL;
-        }
-        cJSON_AddItemToArray(meas_array, meas_obj);
-        cJSON *type_str = cJSON_CreateString(get_meas_type_str(mvector->data[i].type));
-        cJSON_AddItemToObject(meas_obj, "type", type_str);
         cJSON *val = NULL;
         if ( mvector->data[i].type == HUMIDITY) {
             float hum_perc = ( -10000.0 * mvector->data[i].value * 0.001 + 20800 ) / 133;
@@ -55,7 +34,7 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
             val = cJSON_CreateNumber(mvector->data[i].value); 
         }
         if ( val != NULL ) {
-            cJSON_AddItemToObject(meas_obj, "value", val);
+            cJSON_AddItemToObject(json_obj, get_meas_type_str(mvector->data[i].type), val);
         }
     }
     free(timestamp);
