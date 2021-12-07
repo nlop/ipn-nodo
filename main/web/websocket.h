@@ -6,7 +6,7 @@
 #include "web/web_common.h"
 #include "web/json.h"
 #include "utils/mac.h"
-#include "nodo_events.h"
+#include "esp32/nodo_events.h"
 
 #define WEBSOCK_TAG         "WEBSOCKET"
 #define WS_PING_INTERVAL    CONFIG_WEBSOCKET_PING_INT

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "esp_err.h"
 #include "esp_log.h"
-#include "nodo_def.h"
+#include "esp32/nodo_def.h"
 #include "nvs.h"
 
 #define NVS_TAG             "NODO-NVS"

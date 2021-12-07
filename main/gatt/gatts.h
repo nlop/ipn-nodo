@@ -14,7 +14,7 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include "gatt/gatt_def.h"
-#include "nodo_events.h"
+#include "esp32/nodo_events.h"
 #include "nodo_queue.h"
 
 #define GATTS_TAG                   "BLE_GATTS"

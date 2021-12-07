@@ -11,10 +11,10 @@
 #include "nodo_wifi.h"
 #include "nodo_bluetooth.h"
 #include "gatt/gatts.h"
-#include "nodo_events.h"
+#include "esp32/nodo_events.h"
 #include "storage/nodo_nvs.h"
 #include "utils/mac.h"
-#include "nodo_def.h"
+#include "esp32/nodo_def.h"
 #include "web/http.h"
 
 
