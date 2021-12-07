@@ -76,16 +76,21 @@ typedef struct spp_msg_t {
     };
 } spp_msg_t;
 
-typedef struct ws_status_generic {
+typedef struct ws_status_generic_t {
     uint8_t status;
     esp_err_t esp_status;
-} ws_status_generic;
+} ws_status_generic_t;
+
+typedef struct ws_meas_vector_t {
+    measure_vector_t *measure;
+    const char *dev_addr;
+} ws_meas_vector_t;
 
 typedef struct ws_queue_msg_t {
     enum ws_msg_type_t type;
     union {
-        measure_vector_t *meas_vector; 
-        ws_status_generic status;    
+        ws_meas_vector_t *meas_vector; 
+        ws_status_generic_t status;    
     };
 } ws_queue_msg_t;
 

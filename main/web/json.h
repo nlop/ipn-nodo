@@ -22,7 +22,7 @@ enum json_msg_type_t {
 };
 
 cJSON *get_measure_vector_json(measure_vector_t *mvector);
-int json_wrap_message_buff(enum json_msg_status_t , enum json_msg_type_t ,  cJSON *, char *, size_t);
+int json_wrap_message_buff(const char *dev_addr, enum json_msg_status_t , enum json_msg_type_t ,  cJSON *, char *, size_t);
 cJSON *get_generic_msg_json(esp_err_t esp_status, uint8_t status);
 char *json_get_status_str(enum json_msg_status_t status);
 char *json_get_msg_type_str(enum json_msg_type_t type);

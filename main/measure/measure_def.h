@@ -13,7 +13,6 @@ typedef struct measure_t {
 typedef struct measure_vector_t {
     uint8_t len;
     struct measure_t *data;
-    const char *dev_addr;
 } measure_vector_t;
 
 const char *get_meas_type_str(enum measure_type_t type);

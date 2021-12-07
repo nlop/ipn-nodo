@@ -22,21 +22,11 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
         return NULL;
     }
     cJSON_AddItemToObject(json_obj, "timestamp", timestamp_val);
-    cJSON *dev_addr_val = cJSON_CreateString(mvector->dev_addr);
-    if ( dev_addr_val == NULL ) {
-        ESP_LOGE(JSON_TAG, "%s| Error creando objeto JSON: devAddr!", __func__);
-        cJSON_Delete(json_obj);
-        cJSON_Delete(timestamp_val);
-        free(timestamp);
-        return NULL;
-    }
-    cJSON_AddItemToObject(json_obj, "devAddr", dev_addr_val);
     cJSON *meas_array = cJSON_CreateArray();
     if ( meas_array == NULL ) {
         ESP_LOGE(JSON_TAG, "%s| Error creando objeto JSON:measArray!", __func__);
         cJSON_Delete(json_obj);
         cJSON_Delete(timestamp_val);
-        cJSON_Delete(dev_addr_val);
         free(timestamp);
         return NULL;
     }
@@ -48,7 +38,6 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
             cJSON_Delete(meas_array);
             cJSON_Delete(json_obj);
             cJSON_Delete(timestamp_val);
-            cJSON_Delete(dev_addr_val);
             free(timestamp);
             return NULL;
         }
@@ -76,13 +65,20 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
 /*
  * Encapsular el contenido 'content' de un mensaje en un objeto JSON
  */
-int json_wrap_message_buff(enum json_msg_status_t status, enum json_msg_type_t type,  cJSON *content, char *buffer, size_t buffer_len) {
+int json_wrap_message_buff(const char *dev_addr, enum json_msg_status_t status, enum json_msg_type_t type,  cJSON *content, char *buffer, size_t buffer_len) {
     cJSON *json_msg = cJSON_CreateObject();
+    if ( dev_addr != NULL ) {
+        cJSON *addr_str = cJSON_CreateString(dev_addr);
+        if ( addr_str == NULL ) return -1;
+        cJSON_AddItemToObject(json_msg, "devAddr", addr_str);
+    }
     cJSON *status_val = cJSON_CreateString(json_get_status_str(status));
     cJSON_AddItemToObject(json_msg, "status", status_val);
     cJSON *type_val = cJSON_CreateString(json_get_msg_type_str(type));
     cJSON_AddItemToObject(json_msg, "type", type_val);
-    cJSON_AddItemToObject(json_msg, "content", content);
+    if ( content != NULL ) {
+        cJSON_AddItemToObject(json_msg, "content", content);
+    }
     if ( cJSON_PrintPreallocated(json_msg, buffer, buffer_len, false) == 0 ) {
         ESP_LOGE(JSON_TAG, "json_wrap_message_buff: Error guardando JSON en buffer!");
         cJSON_Delete(json_msg);

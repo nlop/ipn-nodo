@@ -48,8 +48,8 @@ void websocket_task(void *pvParameters) {
         memset(buffer, 0, JSON_BUFFER_SIZE);
         if (msg.type == MSG_MEAS_VECTOR_INST || MSG_MEAS_VECTOR_NORM) {
             ESP_LOGI(WEBSOCK_TAG, "MSG_MEAS_VECTOR");
-            cJSON *mvector_json = get_measure_vector_json(msg.meas_vector);
-            int ret = json_wrap_message_buff(STATUS_OK, 
+            cJSON *mvector_json = get_measure_vector_json(msg.meas_vector->measure);
+            int ret = json_wrap_message_buff(msg.meas_vector->dev_addr, STATUS_OK, 
                     (msg.type == MSG_MEAS_VECTOR_INST) ? LIVE_DATA : SAVE_DATA,
                      mvector_json, buffer, 
                      JSON_BUFFER_SIZE );

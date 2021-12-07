@@ -24,7 +24,8 @@ static const adc1_channel_t adc_lm35 = ADC1_CHANNEL_6;
 static const adc1_channel_t adc_hum = ADC1_CHANNEL_7;
 static measure_t mvector_data[3];
 static measure_vector_t mvector = { .len = 3, .data = mvector_data };
-static ws_queue_msg_t ws_msg = { .meas_vector = &mvector };
+static ws_meas_vector_t ws_mvector = { .measure = &mvector };
+static ws_queue_msg_t ws_msg = { .meas_vector = &ws_mvector  };
 #if CONFIG_TSL2561_ENABLED 
 static tsl2561_t dev;
 #elif CONFIG_BH1750_ENABLED 
@@ -44,8 +45,7 @@ void measure_task(void *pvParameters) {
     ESP_LOGI(MEAS_TAG, "Empezando a medir!");
     static ctrl_msg_t ctrl_msg = {0};
     //mvector.data = (measure_t *) calloc(mvector.len, sizeof(measure_t));
-    mvector.dev_addr = nodo_get_mac();
-    ws_msg.meas_vector = &mvector;
+    ws_mvector.dev_addr = nodo_get_mac();
     /* Lectura inicial */
     measure(NORMAL, arg->out_queue);
     for(;;) {

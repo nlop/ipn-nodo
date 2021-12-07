@@ -283,6 +283,7 @@ void init_gatt_server(const EventGroupHandle_t evt_group)
 }
 
 void gatt_task(void *pvParameters) {
+    /* TODO: Revisar */
     gatt_task_arg_t *arg = (gatt_task_arg_t *) pvParameters;
     xEventGroupWaitBits(arg->nodo_evt_group, COMM_CHANNEL_OK, pdFALSE, pdTRUE, portMAX_DELAY);
     xEventGroupSetBits(arg->nodo_evt_group, COMM_DISPATCHER_OK);
@@ -291,8 +292,8 @@ void gatt_task(void *pvParameters) {
         ESP_LOGD(GATT_TASK_TAG, "Esperando mensaje...");
         xQueueReceive(arg->out_queue, (void *) &msg, portMAX_DELAY);
         if (msg.type == MSG_MEAS_VECTOR_NORM) {
-            for(uint8_t i = 0; i < msg.meas_vector->len; i++) {
-                measure_t measure = msg.meas_vector->data[i];
+            for(uint8_t i = 0; i < msg.meas_vector->measure->len; i++) {
+                measure_t measure = msg.meas_vector->measure->data[i];
                 switch (measure.type) {
                     case TEMPERATURE:
                         esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_TEMP_VAL], sizeof(int32_t), (uint8_t *) &measure.value);

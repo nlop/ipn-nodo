@@ -35,9 +35,10 @@ static QueueHandle_t out_queue;
 static gattc_char_vec_t server_chars = { .chars = NULL, .len = 0 };
 /* Variables para measure_vector */
 static measure_t measure_data[3];
-static measure_vector_t meas_vec = {.data = measure_data, .len = 3, .dev_addr = "GATTS_NODE_ADDR" };
+static measure_vector_t meas_vec = {.data = measure_data, .len = 3};
+static ws_meas_vector_t ws_meas_vec = { .dev_addr = "GATTS_NODE_ADDR", .measure = &meas_vec };
 /* Contenedor para mensajes al ws */
-static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR_NORM, .meas_vector = &meas_vec };
+static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR_NORM, .meas_vector = &ws_meas_vec };
 
 /* TODO: reducir ESP_LOGIs del módulo */
 
@@ -443,7 +444,7 @@ int gattc_submit_chars(void) {
             }
             measure_data[i].value = server_chars.chars[i].value;
         }
-        meas_vec.dev_addr = child_addr_str;
+        ws_meas_vec.dev_addr = child_addr_str;
     }
     ESP_LOGI(GATTC_TAG, "Enviando datos...");
     xQueueSendToBack(out_queue, &ws_msg, portMAX_DELAY);
