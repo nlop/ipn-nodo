@@ -59,7 +59,7 @@ static const uint16_t char_pres_fmt_uuid = ESP_GATT_UUID_CHAR_PRESENT_FORMAT;
 static const uint8_t char_properties_rn = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 /* Characteristics values */
 static const int32_t init_value = 0;
-static const int32_t default_system_id = 0xFF01;
+static const uint8_t default_system_id[] = { '0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','1'};
 
 /* Enum de atributos para el perfil */
 enum {
@@ -80,7 +80,7 @@ enum {
     DB_LEN};
 
 /* Tabla de servicios Bluetooth LE */
-static const esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
+static esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
     [ID_SVC] = 
         {{ESP_GATT_AUTO_RSP}, 
             {
@@ -107,9 +107,9 @@ static const esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
                 ESP_UUID_LEN_16,
                 (uint8_t *) &system_id_uuid, 
                 ESP_GATT_PERM_READ,
-                sizeof(int32_t),
-                sizeof(int32_t),
-                (uint8_t *) &default_system_id 
+                16*sizeof(uint8_t),
+                16*sizeof(uint8_t),
+                (uint8_t *) default_system_id 
             }},
     [ID_CHAR_TEMP] =
         {{ESP_GATT_AUTO_RSP},
@@ -225,10 +225,6 @@ static const esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
 
 
 
-/* Funciones */
-void init_gatt_server(const EventGroupHandle_t evt_group);
-void gatt_task(void *pvParameters);
-
 /* Estructuras */
 struct gatts_profile_inst {
     esp_gatts_cb_t gatts_cb;
@@ -245,9 +241,18 @@ struct gatts_profile_inst {
     esp_bt_uuid_t descr_uuid;
 };
 
+typedef struct gatts_instance_id_t {
+    uint8_t *instance_id;
+    size_t len;
+} gatts_instance_id_t;
+
 typedef struct gatt_task_arg_t {
     QueueHandle_t out_queue;            // Cola para recibir paquetes enviados por otros tasks
     EventGroupHandle_t nodo_evt_group;  // Handle al event group de todo el nodo.
 } gatt_task_arg_t;
+
+/* Funciones */
+void init_gatt_server(const EventGroupHandle_t evt_group, gatts_instance_id_t *instance_id);
+void gatt_task(void *pvParameters);
 
 #endif

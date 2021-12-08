@@ -17,7 +17,11 @@ static uint8_t adv_config_done = 0;
 /*
  * Arreglo de handles para todas las entradas de la tabla del servicio
  */
-uint16_t nodo_service_handles[DB_LEN];
+static uint16_t nodo_service_handles[DB_LEN];
+/* Variable que contiene el instance_id del servicio, usada sí se pasa ese
+ * agumento a 'init_gatt_server()'
+ */
+static uint8_t instance_id_value[16];
 
 static esp_ble_adv_params_t adv_params = {
     .adv_int_min         = 0x20,
@@ -251,11 +255,19 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 /*
  * Función para iniciar el servidor GATT de BLE
  */
-void init_gatt_server(const EventGroupHandle_t evt_group)
+void init_gatt_server(const EventGroupHandle_t evt_group, gatts_instance_id_t *instance_id)
 {
     esp_err_t ret;
-    // Copiar el handle al groupo de eventos
+    /* Copiar el handle al groupo de eventos */
     nodo_evt_group_handle = evt_group;
+    /* Copiar instance_id a la tabla, en caso de pasarlo como argumento */
+    if ( instance_id != NULL ) {
+        memcpy(instance_id_value, instance_id->instance_id, INSTANCE_ID_VAL_LEN);
+        gatt_db[ID_INSTANCE_ID_VAL].att_desc.value = instance_id_value;
+        ESP_LOGE(GATTS_TAG, "%s| Nuevo instance_id!", __func__);
+        ESP_LOG_BUFFER_HEX(GATTS_TAG, instance_id->instance_id, instance_id->len);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
     ret = esp_ble_gatts_register_callback(gatts_event_handler);
     if (ret){
         ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
@@ -269,7 +281,6 @@ void init_gatt_server(const EventGroupHandle_t evt_group)
     }
 
     ret = esp_ble_gatts_app_register(GATTS_APP_ID);
-    // TODO: Reemplazar por NODO_SERVICE_ID? ~~^^
     if (ret){
         ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
         return;

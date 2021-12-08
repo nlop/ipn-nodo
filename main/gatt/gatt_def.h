@@ -10,6 +10,7 @@
 #define TEST_DISCOVERY_UUID         0x2a23
 #define HUMIDITY_CHAR_UUID          0x2A6F
 #define LUX_CHAR_UUID               0x2AFB
+#define INSTANCE_ID_VAL_LEN         16
 
 /** Enums **/
 typedef enum {DISCOVERY_CMPL} nodo_gattc_events_t;

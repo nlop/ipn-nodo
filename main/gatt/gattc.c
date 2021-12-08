@@ -23,7 +23,7 @@ static esp_ble_scan_params_t ble_scan_params = {
 
 static uint8_t child_addr [MAC_ADDR_LEN];
 static char child_addr_str [MAC_STR_LEN + 1];
-static uint16_t instance_id = 0;
+static uint8_t instance_id[INSTANCE_ID_VAL_LEN];
 static bool client_init_ok = false;
 static bool connect    = false;
 static bool get_server = false;
@@ -199,7 +199,16 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         esp_log_buffer_hex(GATTC_TAG, p_data->read.value, p_data->read.value_len);
         for(uint8_t i = 0; i < server_chars.len; i++) {
             if ( server_chars.chars[i].handle == p_data->read.handle && p_data->read.value != NULL ) {
-                server_chars.chars[i].value = u16_from_bytes(p_data->read.value, p_data->read.value_len);
+                if ( p_data->read.value_len > 2 ) {
+                    uint8_t *char_buffer = calloc(p_data->read.value_len, sizeof(uint8_t));
+                    if ( char_buffer == NULL ) {
+                        ESP_LOGE(GATTC_TAG, "%s| Error alojando espacio para característica (len > 2)!", __func__);
+                    }
+                    memcpy(char_buffer, p_data->read.value, p_data->read.value_len);
+                    server_chars.chars[i].value_str = char_buffer;
+                } else {
+                    server_chars.chars[i].value_u16 = u16_from_bytes(p_data->read.value, p_data->read.value_len);
+                }
                 read_chars += 1;
                 ESP_LOGI(GATTC_TAG, "Read ok, handle = 0x%02x", p_data->read.handle);
             }
@@ -346,8 +355,8 @@ int init_gatt_client(const QueueHandle_t queue) {
     return 0;
 }
 
-void gattc_set_instance_id(const uint16_t inst_id) {
-    instance_id = inst_id;
+void gattc_set_instance_id(const uint8_t *inst_id) {
+    memcpy(instance_id, inst_id, INSTANCE_ID_VAL_LEN);
 }
 
 void gattc_set_addr(const uint8_t *raw_addr, const char *str_addr) {
@@ -406,13 +415,15 @@ static uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
 
 int gattc_submit_chars(void) {
     ESP_LOGW(GATTC_TAG, "%s| Submit chars!", __func__); 
-    if ( server_chars.len == 1 
+    if ( server_chars.len == INSTANCE_ID_VAL_LEN 
             && server_chars.chars[0].uuid.uuid.uuid16 == TEST_DISCOVERY_UUID ) {
         ESP_LOGW(GATTC_TAG, "%s| DISCOVERY_CMPL", __func__); 
         /* Verificar instance ID */
-        if ( server_chars.chars[0].value != instance_id ) {
+        if ( memcmp(server_chars.chars[0].value_str, instance_id, INSTANCE_ID_VAL_LEN) != 0 ) {
             ESP_LOGE(GATTC_TAG, "%s| Error verificando Instace ID!", __func__);
         }
+        ESP_LOGW(GATTC_TAG, "%s| Nuevo dispositivo verificado!", __func__);
+        ESP_LOG_BUFFER_HEX(GATTC_TAG, instance_id, INSTANCE_ID_VAL_LEN);
         /* Enviar mensaje DISCOVERY_CMPL */
         ws_msg.type = MSG_STATUS_GENERIC;
         ws_msg.status.esp_status = ESP_OK;
@@ -420,7 +431,8 @@ int gattc_submit_chars(void) {
         if ( discovery_cb != NULL ) { discovery_cb(DISCOVERY_CMPL, child_addr); }
         memset(child_addr, 0, sizeof(child_addr)/sizeof(child_addr[0]));
         memset(child_addr_str, 0, sizeof(child_addr_str)/sizeof(child_addr_str[0]));
-        instance_id = 0;
+        memset(instance_id, 0, INSTANCE_ID_VAL_LEN);
+        free(server_chars.chars[0].value_str);
     } else {
         ESP_LOGW(GATTC_TAG, "%s| MEAS_MSG", __func__); 
         if ( server_chars.len > meas_vec.len ) {
@@ -442,13 +454,12 @@ int gattc_submit_chars(void) {
                     ESP_LOGE(GATTC_TAG, "%s| UUID no encontrada!", __func__);
                     continue;
             }
-            measure_data[i].value = server_chars.chars[i].value;
+            measure_data[i].value = server_chars.chars[i].value_u16;
         }
         ws_meas_vec.dev_addr = child_addr_str;
     }
     ESP_LOGI(GATTC_TAG, "Enviando datos...");
     xQueueSendToBack(out_queue, &ws_msg, portMAX_DELAY);
-    // TODO: Cerrar conexión
     esp_ble_gattc_close(gl_profile_tab[NODO_PROFILE_ID].gattc_if, gl_profile_tab[NODO_PROFILE_ID].conn_id);
     return 0;
 }

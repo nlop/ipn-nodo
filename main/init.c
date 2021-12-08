@@ -88,7 +88,7 @@ void nodo_init_ble_gatts(const EventGroupHandle_t evt_group) {
         ESP_LOGE(INIT_TAG, "%s: Error iniciando stack Bluetooth!", __func__);
         return;
     }
-    init_gatt_server(evt_group);
+    init_gatt_server(evt_group, NULL);
 }
 
 /*
@@ -111,7 +111,7 @@ void nodo_init_recv_task(void *pvParameters) {
                             msg_buffer.msg_ssid.ssid, 
                             (msg_buffer.msg_ssid.len < MAX_LEN_SSID) ? msg_buffer.msg_ssid.len : MAX_LEN_SSID);
                     free(msg_buffer.msg_ssid.ssid);
-                    ESP_LOGI(INIT_TAG, "MSG_SSID data: %s, len = %d", ssid, msg_buffer.msg_ssid.len);
+                    ESP_LOGI(INIT_TAG, "MSG_SSID data: %s, len = %zu", ssid, msg_buffer.msg_ssid.len);
                     break;
                 case MSG_PSK:
                     memcpy(
@@ -119,7 +119,7 @@ void nodo_init_recv_task(void *pvParameters) {
                             msg_buffer.msg_psk.psk, 
                             (msg_buffer.msg_psk.len < MAX_LEN_PSK) ? msg_buffer.msg_psk.len : MAX_LEN_PSK);
                     free(msg_buffer.msg_psk.psk);
-                    ESP_LOGI(INIT_TAG, "MSG_PSK data: %s, len = %d", psk, msg_buffer.msg_psk.len);
+                    ESP_LOGI(INIT_TAG, "MSG_PSK data: %s, len = %zu", psk, msg_buffer.msg_psk.len);
                     // TODO: Combinar traza de MSG_SSID/PSK en una sola y leer con FSM
                     nodo_wifi_set_credentials(ssid, psk); 
                     break;
@@ -135,7 +135,11 @@ void nodo_init_recv_task(void *pvParameters) {
                     ESP_LOGI(INIT_TAG, "MSG_INIT_BLE");
                     /* Iniciar el servidor GATT */
                     arg->init_dev_type = NODO_BLE;
-                    init_gatt_server(nodo_event_group);
+                    gatts_instance_id_t instance_id = { 
+                        .instance_id = msg_buffer.ble_init.instance_id,
+                        .len = msg_buffer.ble_init.len
+                    };
+                    init_gatt_server(nodo_event_group, &instance_id);
                     break;
                 case MSG_TOKEN:
                     ESP_LOGI(INIT_TAG, "MSG_TOKEN");

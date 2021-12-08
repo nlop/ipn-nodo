@@ -47,19 +47,24 @@ enum ctrl_msg_type_t {
 /** Estructuras **/
 
 typedef struct spp_msg_ssid_t {
-    uint8_t len;
+    size_t len;
     uint8_t *ssid;
 } spp_msg_ssid_t;
 
 typedef struct spp_msg_psk_t {
-    uint8_t len;
+    size_t len;
     uint8_t *psk;
 } spp_msg_psk_t;
 
 typedef struct spp_msg_token_t {
-    uint8_t len;
+    size_t len;
     uint8_t *token;
 } spp_msg_token_t;
+
+typedef struct spp_msg_init_ble_t {
+    size_t len;
+    uint8_t *instance_id;
+} spp_msg_init_ble_t;
 
 typedef struct spp_msg_scan_ok {
     uint8_t ap_scanned;
@@ -73,6 +78,7 @@ typedef struct spp_msg_t {
         spp_msg_scan_ok msg_scan_ok;         // MSG_SCAN_OK
         nodo_ap_scan_results_t *ap_results;  // MSG_SCAN_SEND
         spp_msg_token_t msg_token;           // MSG_TOKEN
+        spp_msg_init_ble_t ble_init;         // MSG_INIT_BLE
     };
 } spp_msg_t;
 

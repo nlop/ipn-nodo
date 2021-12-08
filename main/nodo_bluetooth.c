@@ -237,6 +237,8 @@ void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param) {
             case MSG_INIT_BLE:
                 ESP_LOGI(BT_TAG, "MSG_INIT_BLE");
                 msg.type = MSG_INIT_BLE; 
+                msg.ble_init.instance_id = copy_msg(param->data_ind.len - 1, param->data_ind.data + 1);
+                msg.ble_init.len = param->data_ind.len - 1;
                 break;
             case MSG_TOKEN:
                 ESP_LOGI(BT_TAG, "MSG_TOKEN");
@@ -249,9 +251,15 @@ void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param) {
         }
     }
     xQueueSendToBack(queue, &msg, portMAX_DELAY);
-    ESP_LOGI(BT_TAG, "Enviando a la fila...");
+    vTaskDelay(pdMS_TO_TICKS(500));
+    //ESP_LOGI(BT_TAG, "Enviando a la fila...");
 }
 
+/* 
+ * Alocar un arreglo de bytes de tamaño 'len', y copiar los contenidos de src
+ * con a los más, 'len' bytes
+ *
+ */
 uint8_t *copy_msg(uint8_t len, uint8_t *src) {
     uint8_t *tmp = calloc(len, sizeof(uint8_t)); 
     memcpy(tmp, src, len);
