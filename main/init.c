@@ -71,6 +71,7 @@ void nodo_init_dev (EventGroupHandle_t event_group) {
     vQueueDelete(queue_in);
     vQueueDelete(queue_out);
     ESP_LOGI(INIT_TAG, "%s: Borrando init queues!", __func__);
+    vTaskDelay(pdMS_TO_TICKS(SPP_DISCONNECT_TIMEOUT));
     if (arg.init_dev_type == NODO_WIFI) {
         nodo_bt_disable();
         ESP_LOGI(INIT_TAG, "%s: Bluetooth desactivado!", __func__);

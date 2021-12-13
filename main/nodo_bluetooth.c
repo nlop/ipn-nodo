@@ -23,6 +23,9 @@ TaskHandle_t send_task_handle;
  */
 uint32_t bt_conn_handle;
 
+esp_bt_controller_status_t nodo_bt_status(void) {
+    return esp_bt_controller_get_status();
+}
 
 int nodo_bt_init(esp_bt_mode_t mode) {
     esp_err_t ret;
@@ -227,8 +230,10 @@ void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param) {
             case MSG_PSK:
                 ESP_LOGI(BT_TAG, "MSG_PSK!");
                 msg.type = MSG_PSK;
-                msg.msg_psk.psk = copy_msg(param->data_ind.len - 1, param->data_ind.data + 1);
-                msg.msg_psk.len = param->data_ind.len - 1;
+                if ( param->data_ind.len > 2 ) {
+                    msg.msg_psk.psk = copy_msg(param->data_ind.len - 1, param->data_ind.data + 1);
+                    msg.msg_psk.len = param->data_ind.len - 1;
+                }
                 break;
             case MSG_INIT:
                 ESP_LOGI(BT_TAG, "MSG_INIT");
@@ -237,14 +242,18 @@ void nodo_spp_init_recv_cb(QueueHandle_t queue, esp_spp_cb_param_t *param) {
             case MSG_INIT_BLE:
                 ESP_LOGI(BT_TAG, "MSG_INIT_BLE");
                 msg.type = MSG_INIT_BLE; 
-                msg.ble_init.instance_id = copy_msg(param->data_ind.len - 1, param->data_ind.data + 1);
-                msg.ble_init.len = param->data_ind.len - 1;
+                if ( param->data_ind.len > 2 ) {
+                    msg.ble_init.instance_id = copy_msg(param->data_ind.len - 1, param->data_ind.data + 1);
+                    msg.ble_init.len = param->data_ind.len - 1;
+                }
                 break;
             case MSG_TOKEN:
                 ESP_LOGI(BT_TAG, "MSG_TOKEN");
                 msg.type = MSG_TOKEN; 
-                msg.msg_token.token = copy_msg(param->data_ind.len - 1, param->data_ind.data + 1);
-                msg.msg_token.len = param->data_ind.len - 1;
+                if ( param->data_ind.len > 2 ) {
+                    msg.msg_token.token = copy_msg(param->data_ind.len - 1, param->data_ind.data + 1);
+                    msg.msg_token.len = param->data_ind.len - 1;
+                }
                 break;
             default:
                 msg.type = MSG_UNKNOWN;

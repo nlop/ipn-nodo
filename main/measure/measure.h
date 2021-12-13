@@ -39,6 +39,7 @@
 // i2c pins
 #define SDA_GPIO            18         // GPIO18 => PIN 9 (DER)
 #define SCL_GPIO            19         // GPIO19 => PIN 8 (DER)
+#define INIT_I2C_ATTEMPTS   10
 #endif
 
 /** Estructuras **/

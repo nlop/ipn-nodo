@@ -44,9 +44,10 @@ void websocket_task(void *pvParameters) {
     char buffer[JSON_BUFFER_SIZE];
     for(;;) {
         ESP_LOGI(WEBSOCK_TAG, "Esperando mensajes..");
-        xQueueReceive(arg->out_queue, (void *) &msg, portMAX_DELAY);
         memset(buffer, 0, JSON_BUFFER_SIZE);
-        if (msg.type == MSG_MEAS_VECTOR_INST || MSG_MEAS_VECTOR_NORM) {
+        xQueueReceive(arg->out_queue, (void *) &msg, portMAX_DELAY);
+        ESP_LOGW(WEBSOCK_TAG, "Nuevo mensaje!.");
+        if (msg.type == MSG_MEAS_VECTOR_INST || msg.type == MSG_MEAS_VECTOR_NORM) {
             ESP_LOGI(WEBSOCK_TAG, "MSG_MEAS_VECTOR");
             cJSON *mvector_json = get_measure_vector_json(msg.meas_vector->measure);
             int ret = json_wrap_message_buff(msg.meas_vector->dev_addr, STATUS_OK, 
@@ -63,7 +64,7 @@ void websocket_task(void *pvParameters) {
             esp_websocket_client_send_text(ws_client, buffer, strlen(buffer), portMAX_DELAY);
         } else if (msg.type == MSG_STATUS_GENERIC) {
             ESP_LOGI(WEBSOCK_TAG, "MSG_STATUS_GENERIC");
-            cJSON *msg_generic_json = get_generic_msg_json(msg.status.esp_status, msg.status.status);
+            cJSON *msg_generic_json = get_generic_msg_json(nodo_get_mac(), msg.status.esp_status, msg.status.type);
             if ( msg_generic_json != NULL && 
                     cJSON_PrintPreallocated(msg_generic_json, buffer, JSON_BUFFER_SIZE, false) == 0 ) {
                 ESP_LOGE(WEBSOCK_TAG, "json_wrap_message_buff: Error guardando JSON en buffer!");
@@ -151,23 +152,30 @@ static void ws_message_handler(cJSON *msg, ws_msg_handler_arg_t *args) {
     }
     /* TODO: Refactorizar a la parte de control en measure.c */
     if ( strcmp(msg_type->valuestring, "dev-discovery") == 0 ) {
+        uint8_t *instance_id;
         cJSON *content = cJSON_GetObjectItem(msg, "content");
         if (!cJSON_IsObject(content)) {
             ESP_LOGE(WEBSOCK_TAG, "%s: Error parsing content", __func__);
             return; 
         }
         uint8_t *addr;
-        cJSON *instance_id = cJSON_GetObjectItem(content, "instanceId");
-        if ( instance_id == NULL || instance_id->valueint == 0) {
+        cJSON *instance_id_json = cJSON_GetObjectItem(content, "instanceId");
+        if ( instance_id_json == NULL || instance_id_json->valuestring == NULL || 
+                strlen(instance_id_json->string) == INSTANCE_ID_VAL_LEN) {
             ESP_LOGE(WEBSOCK_TAG, "%s| Error parsing instanceID!", __func__);
-            cJSON_Delete(instance_id);
+            cJSON_Delete(instance_id_json);
             return;
         }
+        if ( (instance_id = calloc(INSTANCE_ID_VAL_LEN, sizeof(uint8_t))) == NULL ) {
+            ESP_LOGE(WEBSOCK_TAG, "%s| Error alocando instance_id!", __func__);
+            return;
+        }
+        memcpy(instance_id, instance_id_json->valuestring, INSTANCE_ID_VAL_LEN);
         cJSON *child = cJSON_GetObjectItem(content, "child");
         if ( child == NULL ) {
             ESP_LOGE(WEBSOCK_TAG, "%s| Error parsing child!", __func__);
             cJSON_Delete(child);
-            cJSON_Delete(instance_id);
+            cJSON_Delete(instance_id_json);
             return;
         }
         if ( ( addr = parse_u8_array(child, MAC_ADDR_LEN) ) == NULL ) {
@@ -175,9 +183,11 @@ static void ws_message_handler(cJSON *msg, ws_msg_handler_arg_t *args) {
         }
         ESP_LOGI(WEBSOCK_TAG, "%s| Dirección hijo:", __func__);
         ESP_LOG_BUFFER_HEX(WEBSOCK_TAG, addr, MAC_ADDR_LEN);
+        ESP_LOGI(WEBSOCK_TAG, "%s| Instanceid:", __func__);
+        ESP_LOG_BUFFER_HEX(WEBSOCK_TAG, instance_id, INSTANCE_ID_VAL_LEN);
         ctrl_msg_t ctrl_msg = {
             .type = MSG_DEV_DISCOVERY, 
-            .discovery = { .dev_addr = addr, .instance_id = instance_id->valueint}
+            .discovery = { .dev_addr = addr, .instance_id = instance_id}
         };  
         /* Notificar al control */
         xQueueSendToBack(args->ctrl_queue,&ctrl_msg, portMAX_DELAY);

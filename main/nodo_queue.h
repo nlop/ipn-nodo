@@ -82,8 +82,10 @@ typedef struct spp_msg_t {
     };
 } spp_msg_t;
 
+enum esp32_status_msg_t { DEV_DISCOVERY_CMPL };
+
 typedef struct ws_status_generic_t {
-    uint8_t status;
+    enum esp32_status_msg_t type;
     esp_err_t esp_status;
 } ws_status_generic_t;
 
@@ -102,7 +104,7 @@ typedef struct ws_queue_msg_t {
 
 typedef struct ctrl_msg_dev_discovery_t {
     uint8_t *dev_addr;
-    uint16_t instance_id;
+    uint8_t *instance_id;
 } ctrl_msg_dev_discovery_t;
 
 typedef struct ctrl_msg_ {

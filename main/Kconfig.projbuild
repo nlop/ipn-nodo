@@ -30,6 +30,12 @@ menu "IPN-NODO Menu"
         config GATTC_WAIT_START_TIMEOUT
         int "Timeouts para iniciar el cliente GATT (ms)"
         default 3000
+        config GATTC_DISCOVERY_TIMEOUT
+        int "Timeouts para terminar el descubrimiento del tiempo (s)"
+        default 30
+        config GATTC_MAX_CONNECT_ATTEMPTS
+        int "Número máximo de intentos para conectarse a un servidor GATT"
+        default 15
     endmenu
     menu "Sensores"
         config MEASURE_RATE_MS

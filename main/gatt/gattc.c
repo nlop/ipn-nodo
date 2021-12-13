@@ -5,6 +5,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
 static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 static uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len);
+static void gattc_init_fail(void);
 
 /* GATT Server char UUIDs */
 static esp_bt_uuid_t remote_filter_service_uuid = {
@@ -158,10 +159,6 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                     ESP_LOGE(GATTC_TAG, "Error leyendo temperatura %s", esp_err_to_name(ret));
                 }
             }
-            //discovery_cb(DISCOVERY_CMPL, discovery_cb_arg); 
-            // TODO: EN lugar de llamar a la CB para notificar el
-            // descubrimiento, mandar un mensaje desde este módulo, filtrando
-            // el UUID de la característica especial para la inicialización
         }
         break;
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
@@ -199,7 +196,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         esp_log_buffer_hex(GATTC_TAG, p_data->read.value, p_data->read.value_len);
         for(uint8_t i = 0; i < server_chars.len; i++) {
             if ( server_chars.chars[i].handle == p_data->read.handle && p_data->read.value != NULL ) {
-                if ( p_data->read.value_len > 2 ) {
+                if ( p_data->read.value_len > 4 ) {
                     uint8_t *char_buffer = calloc(p_data->read.value_len, sizeof(uint8_t));
                     if ( char_buffer == NULL ) {
                         ESP_LOGE(GATTC_TAG, "%s| Error alojando espacio para característica (len > 2)!", __func__);
@@ -207,7 +204,9 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                     memcpy(char_buffer, p_data->read.value, p_data->read.value_len);
                     server_chars.chars[i].value_str = char_buffer;
                 } else {
-                    server_chars.chars[i].value_u16 = u16_from_bytes(p_data->read.value, p_data->read.value_len);
+                    uint16_t temp = u16_from_bytes(p_data->read.value, p_data->read.value_len);
+                    ESP_LOGI(GATTC_TAG, "%s| u16_from_bytes: %u", __func__, temp);
+                    server_chars.chars[i].value_u16 = temp;
                 }
                 read_chars += 1;
                 ESP_LOGI(GATTC_TAG, "Read ok, handle = 0x%02x", p_data->read.handle);
@@ -263,6 +262,11 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             }
             break;
         case ESP_GAP_SEARCH_INQ_CMPL_EVT:
+            ESP_LOGI(GATTC_TAG, "Scan done!");
+            if ( connect == false ) {
+                ESP_LOGE(GATTC_TAG, "Not found!");
+                gattc_init_fail();
+            }
             break;
         default:
             break;
@@ -357,6 +361,8 @@ int init_gatt_client(const QueueHandle_t queue) {
 
 void gattc_set_instance_id(const uint8_t *inst_id) {
     memcpy(instance_id, inst_id, INSTANCE_ID_VAL_LEN);
+    ESP_LOGW(GATTC_TAG, "%s| instance_id:", __func__);
+    ESP_LOG_BUFFER_HEX(GATTC_TAG, instance_id, INSTANCE_ID_VAL_LEN);
 }
 
 void gattc_set_addr(const uint8_t *raw_addr, const char *str_addr) {
@@ -413,26 +419,42 @@ static uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
     return len >= 2 ? ( ( ( 0L | bytes[1] ) << 8 ) | bytes[0] ) : 0;
 }
 
+void gattc_init_fail(void) {
+    ws_queue_msg_t msg = { .type = MSG_STATUS_GENERIC, .status = { .esp_status = ESP_FAIL, .type = DEV_DISCOVERY_CMPL }};
+    xQueueSendToBack(out_queue, &msg, portMAX_DELAY);
+}
+
 int gattc_submit_chars(void) {
     ESP_LOGW(GATTC_TAG, "%s| Submit chars!", __func__); 
-    if ( server_chars.len == INSTANCE_ID_VAL_LEN 
+    if ( server_chars.len == 1 
             && server_chars.chars[0].uuid.uuid.uuid16 == TEST_DISCOVERY_UUID ) {
+        bool discovery_ok = false;
+        ws_queue_msg_t disco_msg = { .type = MSG_STATUS_GENERIC, 
+            .status = { .type = DEV_DISCOVERY_CMPL, .esp_status = ESP_FAIL }};
         ESP_LOGW(GATTC_TAG, "%s| DISCOVERY_CMPL", __func__); 
         /* Verificar instance ID */
+        ESP_LOG_BUFFER_HEX(GATTC_TAG, server_chars.chars[0].value_str, INSTANCE_ID_VAL_LEN);
+        ESP_LOG_BUFFER_HEX(GATTC_TAG, instance_id, INSTANCE_ID_VAL_LEN);
         if ( memcmp(server_chars.chars[0].value_str, instance_id, INSTANCE_ID_VAL_LEN) != 0 ) {
             ESP_LOGE(GATTC_TAG, "%s| Error verificando Instace ID!", __func__);
+        } else {
+            ESP_LOGW(GATTC_TAG, "%s| Nuevo dispositivo verificado!", __func__);
+            ESP_LOG_BUFFER_HEX(GATTC_TAG, instance_id, INSTANCE_ID_VAL_LEN);
+            /* Enviar mensaje DISCOVERY_CMPL */
+            disco_msg.status.esp_status = ESP_OK;
+            discovery_ok = true;
         }
-        ESP_LOGW(GATTC_TAG, "%s| Nuevo dispositivo verificado!", __func__);
-        ESP_LOG_BUFFER_HEX(GATTC_TAG, instance_id, INSTANCE_ID_VAL_LEN);
-        /* Enviar mensaje DISCOVERY_CMPL */
-        ws_msg.type = MSG_STATUS_GENERIC;
-        ws_msg.status.esp_status = ESP_OK;
-        ws_msg.status.status = DISCOVERY_CMPL;
-        if ( discovery_cb != NULL ) { discovery_cb(DISCOVERY_CMPL, child_addr); }
-        memset(child_addr, 0, sizeof(child_addr)/sizeof(child_addr[0]));
-        memset(child_addr_str, 0, sizeof(child_addr_str)/sizeof(child_addr_str[0]));
-        memset(instance_id, 0, INSTANCE_ID_VAL_LEN);
+        xQueueSendToBack(out_queue, &disco_msg, portMAX_DELAY);
+        esp_ble_gattc_close(gl_profile_tab[NODO_PROFILE_ID].gattc_if, gl_profile_tab[NODO_PROFILE_ID].conn_id);
+        if ( discovery_ok == false ) { /* Liberar solamente si no se pudo descubrir -> no reinicio */
+            memset(child_addr, 0, sizeof(child_addr)/sizeof(child_addr[0]));
+            memset(child_addr_str, 0, sizeof(child_addr_str)/sizeof(child_addr_str[0]));
+            memset(instance_id, 0, INSTANCE_ID_VAL_LEN);
+        }
         free(server_chars.chars[0].value_str);
+        if ( discovery_cb != NULL ) { 
+            discovery_cb( ( discovery_ok == true) ? DISCOVERY_CMPL : DISCOVERY_CMPL_FAIL, child_addr); /* Llamar al final por reinicio! */
+        }
     } else {
         ESP_LOGW(GATTC_TAG, "%s| MEAS_MSG", __func__); 
         if ( server_chars.len > meas_vec.len ) {
@@ -442,13 +464,16 @@ int gattc_submit_chars(void) {
         for(uint8_t i = 0; i < server_chars.len ; i++) {
             switch( server_chars.chars[i].uuid.uuid.uuid16 ) {
                 case TEMP_CHAR_UUID:
+                    ESP_LOGI(GATTC_TAG, "%s : %u", "TEMPERATURE", server_chars.chars[i].value_u16);
                     measure_data[i].type = TEMPERATURE;
                     break;
                 case HUMIDITY_CHAR_UUID:
                     measure_data[i].type = HUMIDITY;
+                    ESP_LOGI(GATTC_TAG, "%s : %u", "HUMIDITY", server_chars.chars[i].value_u16);
                     break;
                 case LUX_CHAR_UUID:
                     measure_data[i].type = LIGHT;
+                    ESP_LOGI(GATTC_TAG, "%s : %u", "LIGHT", server_chars.chars[i].value_u16);
                     break;
                 default:
                     ESP_LOGE(GATTC_TAG, "%s| UUID no encontrada!", __func__);
@@ -457,9 +482,10 @@ int gattc_submit_chars(void) {
             measure_data[i].value = server_chars.chars[i].value_u16;
         }
         ws_meas_vec.dev_addr = child_addr_str;
+        ESP_LOGI(GATTC_TAG, "Enviando datos...");
+        xQueueSendToBack(out_queue, &ws_msg, portMAX_DELAY);
     }
-    ESP_LOGI(GATTC_TAG, "Enviando datos...");
-    xQueueSendToBack(out_queue, &ws_msg, portMAX_DELAY);
+    vTaskDelay(pdMS_TO_TICKS(500));
     esp_ble_gattc_close(gl_profile_tab[NODO_PROFILE_ID].gattc_if, gl_profile_tab[NODO_PROFILE_ID].conn_id);
     return 0;
 }

@@ -46,5 +46,6 @@ void nodo_init_send_task(void *pvParameters);
 byte_buffer_t nodo_ap_data_prepare(wifi_ap_record_t *ap_record);
 void nodo_bt_disable(void);
 void nodo_spp_disable(void);
+esp_bt_controller_status_t nodo_bt_status(void);
 
 #endif

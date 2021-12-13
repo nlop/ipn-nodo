@@ -25,8 +25,8 @@
 #define PROFILE_NUM                 1
 #define NODO_PROFILE_ID             0
 #define INVALID_HANDLE              0
-#define GATTC_SCAN_TIMEOUT          30                  /* Tiempo para escanear servidores BLE */
-#define MAX_GATTC_ATTEMPTS          15
+#define GATTC_SCAN_TIMEOUT          CONFIG_GATTC_DISCOVERY_TIMEOUT      /* Tiempo para escanear servidores BLE */
+#define MAX_GATTC_ATTEMPTS          CONFIG_GATTC_MAX_CONNECT_ATTEMPTS
 #define GATTC_WAIT_START_TIMEOUT    CONFIG_GATTC_WAIT_START_TIMEOUT
 
 

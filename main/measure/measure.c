@@ -1,11 +1,4 @@
 #include "measure/measure.h"
-/* TODO:
- *      + Revisar la atenuación de los ADCs dependiendo de los máximos de entrada para cada
- *      dispositivo
- *      + Considerar utilizar op-amps para un mejor acoplamiento del sensor de humedad o aumentar
- *      la atenuación
- *
- */
 
 enum meas_type_t { INSTANT, NORMAL };
 
@@ -15,7 +8,7 @@ static int sinknode_measure(spiffs_db_t *gattc_db);
 static int init_measure_(void);
 static void control(ctrl_msg_t msg, meas_task_arg_t *ctx);
 static void gattc_init_callback(nodo_gattc_events_t evt, void *arg);
-static int dev_discovery(uint8_t *addr, uint16_t instance_id, QueueHandle_t queue);
+static int dev_discovery(uint8_t *addr, uint8_t *instance_id, QueueHandle_t queue);
 
 static esp_adc_cal_characteristics_t *adc1_ch6_chars, *adc1_ch7_chars;
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
@@ -26,6 +19,9 @@ static measure_t mvector_data[3];
 static measure_vector_t mvector = { .len = 3, .data = mvector_data };
 static ws_meas_vector_t ws_mvector = { .measure = &mvector };
 static ws_queue_msg_t ws_msg = { .meas_vector = &ws_mvector  };
+#if CONFIG_TSL2561_ENABLED || CONFIG_BH1750_ENABLED
+static bool lux_meas_ok = false;
+#endif
 #if CONFIG_TSL2561_ENABLED 
 static tsl2561_t dev;
 #elif CONFIG_BH1750_ENABLED 
@@ -48,6 +44,9 @@ void measure_task(void *pvParameters) {
     ws_mvector.dev_addr = nodo_get_mac();
     /* Lectura inicial */
     measure(NORMAL, arg->out_queue);
+    if ( ( dev_type == SINKNODE ) && ( arg->gattc_db != NULL ) ) {
+        sinknode_measure(arg->gattc_db);
+    }
     for(;;) {
         ESP_LOGI(MEAS_TAG, "Datos enviados!");
         if ( dev_type == NODO_WIFI || dev_type == SINKNODE ) {
@@ -64,7 +63,11 @@ void measure_task(void *pvParameters) {
             }
         } else {
             measure(NORMAL, arg->out_queue);
-            vTaskDelay(pdMS_TO_TICKS(MEASURE_RATE_MS));
+            /* Realizar más lecturas cuando es BLE */
+            if ( dev_type == NODO_BLE )  
+                vTaskDelay(pdMS_TO_TICKS(MEASURE_RATE_MS / 4));
+            else 
+                vTaskDelay(pdMS_TO_TICKS(MEASURE_RATE_MS));
         }
     }
     vTaskDelete(NULL);
@@ -72,22 +75,47 @@ void measure_task(void *pvParameters) {
 
 static int init_measure_(void) {
     // Preparar dispositivos
+    for (int i = 0; i < INIT_I2C_ATTEMPTS; i++ ) {
 #if CONFIG_TSL2561_ENABLED || CONFIG_BH1750_ENABLED
-    /* Inicializar el bus i2c */
-    ESP_ERROR_CHECK(i2cdev_init());
+        /* Inicializar el bus i2c */
+        if ( i2cdev_init() != ESP_OK ) {
+            ESP_LOGE(MEAS_TAG, "%s Error iniciando i2c!", __func__);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        };
 #endif
 #if CONFIG_TSL2561_ENABLED 
-    ESP_LOGI(MEAS_TAG, "Utilizando sensor TSL2561!");
-    memset(&dev, 0, sizeof(tsl2561_t));
-    ESP_ERROR_CHECK(tsl2561_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO));
-    ESP_ERROR_CHECK(tsl2561_init(&dev));
-    ESP_LOGI(MEAS_TAG, "Found TSL2561 in package %s\n", dev.package_type == TSL2561_PACKAGE_CS ? "CS" : "T/FN/CL");
+        ESP_LOGI(MEAS_TAG, "Utilizando sensor TSL2561!");
+        memset(&dev, 0, sizeof(tsl2561_t));
+        if( tsl2561_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO) != ESP_OK ) {
+            ESP_LOGE(MEAS_TAG, "%s Error iniciando TSL2561 (desc)!", __func__);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+        if( tsl2561_init(&dev) != ESP_OK ) {
+            ESP_LOGE(MEAS_TAG, "%s Error iniciando TSL2561 (init)!", __func__);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+        ESP_LOGI(MEAS_TAG, "Found TSL2561 in package %s\n", dev.package_type == TSL2561_PACKAGE_CS ? "CS" : "T/FN/CL");
 #elif CONFIG_BH1750_ENABLED 
-    ESP_LOGI(MEAS_TAG, "Utilizando sensor BH1750!");
-    memset(&dev, 0, sizeof(i2c_dev_t));
-    ESP_ERROR_CHECK(bh1750_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO));
-    ESP_ERROR_CHECK(bh1750_setup(&dev, BH1750_MODE_CONTINUOUS, BH1750_RES_HIGH));
+        ESP_LOGI(MEAS_TAG, "Utilizando sensor BH1750!");
+        memset(&dev, 0, sizeof(i2c_dev_t));
+        ESP_ERROR_CHECK(bh1750_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO));
+        if( bh1750_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO) != ESP_OK ) {
+            ESP_LOGE(MEAS_TAG, "%s Error iniciando TSL2561 (init)!", __func__);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+        if( bh1750_setup(&dev, BH1750_MODE_CONTINUOUS, BH1750_RES_HIGH) != ESP_OK) {
+            ESP_LOGE(MEAS_TAG, "%s Error iniciando BH1750 (setup)!", __func__);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
 #endif
+        lux_meas_ok = true;
+        break;
+    }
     /*** Configuración ADC1 ***/
     adc1_config_width(width);
     // Canal 6 del ADC1 (GPIO34)
@@ -122,11 +150,11 @@ static void control(ctrl_msg_t msg, meas_task_arg_t *ctx) {
     }
 }
 
-static int dev_discovery(uint8_t *addr, uint16_t instance_id, QueueHandle_t queue) {
+static int dev_discovery(uint8_t *addr, uint8_t *instance_id, QueueHandle_t queue) {
     /* GATTC Init */
     uint16_t const init_char[] = { TEST_DISCOVERY_UUID };
     /* Habilitar el stack BT/BLE sí no esta habilitado */
-    if (dev_type == NODO_WIFI) {
+    if (dev_type == NODO_WIFI && nodo_bt_status() != ESP_BT_CONTROLLER_STATUS_ENABLED) {
         //ESP_LOGI(MEAS_TAG, "%s| Debería habilitar BT/BLE & iniciar GATTC...", __func__);
         ESP_LOGI(MEAS_TAG, "%s: Habilitando stack BT/BLE...", __func__);
         if ( nodo_bt_init(ESP_BT_MODE_BLE) != 0 ) {
@@ -143,6 +171,7 @@ static int dev_discovery(uint8_t *addr, uint16_t instance_id, QueueHandle_t queu
     char *addr_str = (char *) calloc(MAC_STR_LEN + 1, sizeof(char));
     get_mac_str(addr, addr_str);
     gattc_set_addr(addr, addr_str);
+    gattc_set_instance_id(instance_id);
     if ( gattc_set_chars(init_char, sizeof(init_char)/sizeof(init_char[0])) != 0) {
         ESP_LOGE(MEAS_TAG, "%s: Error declarando chars!", __func__); 
         return -1; 
@@ -170,6 +199,7 @@ static void gattc_init_callback(nodo_gattc_events_t evt, void *arg) {
      * |-> Parcialmente cubierto en nodo_gattc.h! */
     if ( evt == DISCOVERY_CMPL ) {
         /* Guardar en SPIFFS */
+        // ====>
         if ( ( dev_type == NODO_WIFI ) &&  ( spiffs_init() != 0 ) ) {
             ESP_LOGE(MEAS_TAG, "%s| Error inicializando almacenamiento SPIFFS!", __func__);
             return;
@@ -186,9 +216,11 @@ static void gattc_init_callback(nodo_gattc_events_t evt, void *arg) {
             ESP_LOGE(MEAS_TAG, "%s| Error guardando nuevo modo (SINKNODE)!", __func__);
         }
         spiffs_umount();
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        // <====
+        vTaskDelay(pdMS_TO_TICKS(5000));
         /* Reiniciar para inicializar con nuevo modo o leer de nuevo la lista y
          * realizar la primera lectura */
+        ESP_LOGW(MEAS_TAG, "Reiniciando en 5s...!");
         esp_restart();
         /* Ruta alternativa sin reinicio <<< Genera errores de ejecución >>> */
         //gattc_db.len += 1;
@@ -214,8 +246,8 @@ static void gattc_init_callback(nodo_gattc_events_t evt, void *arg) {
         //    ESP_LOGE(MEAS_TAG, "%s: Error declarando chars!", __func__); 
         //    return; 
         //}
-        unregister_discovery_cb();
     }
+    unregister_discovery_cb();
 }
 
 static int measure(enum meas_type_t type, QueueHandle_t out_queue) {
@@ -243,22 +275,26 @@ static int measure(enum meas_type_t type, QueueHandle_t out_queue) {
     mvector_data[1].type = HUMIDITY;
     mvector_data[1].value = hum_vol;
 #if CONFIG_TSL2561_ENABLED 
-    static uint32_t lux;
-    // TSL2561
-    if ((res = tsl2561_read_lux(&dev, &lux)) != ESP_OK)
-        ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
-    else
-        ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
-    mvector_data[2].type = LIGHT;
-    mvector_data[2].value = lux;
+    if ( lux_meas_ok == true ) {
+        static uint32_t lux;
+        // TSL2561
+        if ((res = tsl2561_read_lux(&dev, &lux)) != ESP_OK)
+            ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
+        else
+            ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
+        mvector_data[2].type = LIGHT;
+        mvector_data[2].value = lux;
+    }
 #elif CONFIG_BH1750_ENABLED
-    static uint16_t lux;
-    if ((res = bh1750_read(&dev, &lux)) != ESP_OK)
-        ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
-    else
-        ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
-    mvector_data[2].type = LIGHT;
-    mvector_data[2].value = lux;
+    if ( lux_meas_ok == true ) {
+        static uint16_t lux;
+        if ((res = bh1750_read(&dev, &lux)) != ESP_OK)
+            ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
+        else
+            ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
+        mvector_data[2].type = LIGHT;
+        mvector_data[2].value = lux;
+    }
 #else
     mvector_data[2].type = LIGHT;
     mvector_data[2].value = 0;

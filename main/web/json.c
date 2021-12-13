@@ -67,12 +67,20 @@ int json_wrap_message_buff(const char *dev_addr, enum json_msg_status_t status, 
     return 0;
 }
 
-cJSON *get_generic_msg_json(esp_err_t esp_status, uint8_t status) {
+cJSON *get_generic_msg_json(const char *dev_addr, esp_err_t esp_status, enum esp32_status_msg_t status) {
     cJSON *json_msg = cJSON_CreateObject();
-    cJSON *status_val = cJSON_CreateString( (esp_status == ESP_OK) ? "ESP_OK" : "ESP_ERR" );
-    if (status == DISCOVERY_CMPL) {
+    if ( json_msg == NULL ) {
+        ESP_LOGE(JSON_TAG, "%s| Error creando generic_msg", __func__);
+        return NULL;
+    }
+    if ( dev_addr != NULL ) {
+        cJSON *dev_addr_json = cJSON_CreateString(dev_addr);
+        cJSON_AddItemToObject(json_msg, "devAddr", dev_addr_json);
+    }
+    cJSON *status_val = cJSON_CreateString( (esp_status == ESP_OK) ? "ok" : "error" );
+    if (status == DEV_DISCOVERY_CMPL) {
         cJSON_AddItemToObject(json_msg, "status", status_val);
-        cJSON *type_val = cJSON_CreateString(nodo_gattc_event_to_name(DISCOVERY_CMPL));
+        cJSON *type_val = cJSON_CreateString("dev-discovery");
         cJSON_AddItemToObject(json_msg, "type", type_val);
     }
     return json_msg;
@@ -92,13 +100,13 @@ uint8_t *parse_u8_array(cJSON *array, size_t len) {
             return NULL;
         }
         cJSON_ArrayForEach(item, array){
-            if (!cJSON_IsNumber(item) ) {
+            ESP_LOGI(JSON_TAG, "%s| item: %d", __func__, item->valueint);
+            if ( !cJSON_IsNumber(item) ) {
                 ESP_LOGE(JSON_TAG, "%s: Error parsing child (addr)!", __func__);
                 free(addr);
                 return NULL;
             }
-            if (i < len)
-                addr[i++] = (uint8_t ) item->valueint;
+            if (i < len) addr[i++] = (uint8_t) item->valueint;
         }
     }
     return addr;
