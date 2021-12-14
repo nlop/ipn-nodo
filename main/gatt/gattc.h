@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"

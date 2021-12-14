@@ -40,6 +40,7 @@ static measure_vector_t meas_vec = {.data = measure_data, .len = 3};
 static ws_meas_vector_t ws_meas_vec = { .dev_addr = "GATTS_NODE_ADDR", .measure = &meas_vec };
 /* Contenedor para mensajes al ws */
 static ws_queue_msg_t ws_msg = { .type = MSG_MEAS_VECTOR_NORM, .meas_vector = &ws_meas_vec };
+static SemaphoreHandle_t gattc_sem;
 
 /* TODO: reducir ESP_LOGIs del módulo */
 
@@ -196,7 +197,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         esp_log_buffer_hex(GATTC_TAG, p_data->read.value, p_data->read.value_len);
         for(uint8_t i = 0; i < server_chars.len; i++) {
             if ( server_chars.chars[i].handle == p_data->read.handle && p_data->read.value != NULL ) {
-                if ( p_data->read.value_len > 4 ) {
+                if ( server_chars.chars[i].uuid.uuid.uuid16 == TEST_DISCOVERY_UUID ) {
                     uint8_t *char_buffer = calloc(p_data->read.value_len, sizeof(uint8_t));
                     if ( char_buffer == NULL ) {
                         ESP_LOGE(GATTC_TAG, "%s| Error alojando espacio para característica (len > 2)!", __func__);
@@ -244,7 +245,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
         esp_ble_gap_cb_param_t *scan_result = (esp_ble_gap_cb_param_t *)param;
         switch (scan_result->scan_rst.search_evt) {
         case ESP_GAP_SEARCH_INQ_RES_EVT:
-            esp_log_buffer_hex(GATTC_TAG, scan_result->scan_rst.bda, 6);
+            //esp_log_buffer_hex(GATTC_TAG, scan_result->scan_rst.bda, 6);
             ESP_LOGI(GATTC_TAG, "searched Adv Data Len %d, Scan Response Len %d", scan_result->scan_rst.adv_data_len, scan_result->scan_rst.scan_rsp_len);
             /* Ver /components/bt/host/bluedroid/api/include/api/esp_gap_ble_api.h:228 para resolver otros tipos */
             /* adv_name = esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv,
@@ -266,6 +267,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             if ( connect == false ) {
                 ESP_LOGE(GATTC_TAG, "Not found!");
                 gattc_init_fail();
+                xSemaphoreGive(gattc_sem);
             }
             break;
         default:
@@ -405,12 +407,21 @@ int gattc_set_chars(const uint16_t *chars, uint8_t chars_len) {
 
 /* Llamar una vez que se ha llamado a la función set_params */
 int nodo_gattc_start(void) {
+    gattc_sem = xSemaphoreCreateBinary(); 
+    if ( gattc_sem == NULL ) {
+        ESP_LOGE(GATTC_TAG, "%s| Semaforo no creado!", __func__);
+        return -1;
+    }
+    xSemaphoreGive(gattc_sem);
     if ( !client_init_ok ) {
         ESP_LOGE(GATTC_TAG, "%s| Cliente no inicializado!", __func__);
         return -1;
     }
+    vTaskDelay(500);
     ESP_LOGI(GATTC_TAG, "%s| Start scanning!", __func__);
+    xSemaphoreTake(gattc_sem, portMAX_DELAY);
     esp_ble_gap_start_scanning(GATTC_SCAN_TIMEOUT);
+    xSemaphoreTake(gattc_sem, pdMS_TO_TICKS(GATTC_SCAN_TIMEOUT + 5000));
     return 0;
 }
 
@@ -487,6 +498,7 @@ int gattc_submit_chars(void) {
     }
     vTaskDelay(pdMS_TO_TICKS(500));
     esp_ble_gattc_close(gl_profile_tab[NODO_PROFILE_ID].gattc_if, gl_profile_tab[NODO_PROFILE_ID].conn_id);
+    xSemaphoreGive(gattc_sem);
     return 0;
 }
 

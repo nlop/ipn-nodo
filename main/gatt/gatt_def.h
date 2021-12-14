@@ -7,7 +7,7 @@
 #define REMOTE_SERVICE_UUID         0x3931
 #define REMOTE_NOTIFY_CHAR_UUID     0xFF01
 #define TEMP_CHAR_UUID              0x2A6E
-#define TEST_DISCOVERY_UUID         0x2a23
+#define TEST_DISCOVERY_UUID         0x2A23
 #define HUMIDITY_CHAR_UUID          0x2A6F
 #define LUX_CHAR_UUID               0x2AFB
 #define INSTANCE_ID_VAL_LEN         16
