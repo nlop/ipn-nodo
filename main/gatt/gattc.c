@@ -5,6 +5,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
 static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 static uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len);
+static uint32_t u32_from_bytes(const uint8_t *bytes, uint8_t len);
 static void gattc_init_fail(void);
 
 /* GATT Server char UUIDs */
@@ -205,9 +206,15 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                     memcpy(char_buffer, p_data->read.value, p_data->read.value_len);
                     server_chars.chars[i].value_str = char_buffer;
                 } else {
+                    if ( p_data->read.value_len == 2 ) {
                     uint16_t temp = u16_from_bytes(p_data->read.value, p_data->read.value_len);
                     ESP_LOGI(GATTC_TAG, "%s| u16_from_bytes: %u", __func__, temp);
                     server_chars.chars[i].value_u16 = temp;
+                    } else if ( p_data->read.value_len == 4 ) {
+                        uint32_t temp = u32_from_bytes(p_data->read.value, p_data->read.value_len);
+                        ESP_LOGI(GATTC_TAG, "%s| u32_from_bytes: %u", __func__, temp);
+                        server_chars.chars[i].value_u32 = temp;
+                    }
                 }
                 read_chars += 1;
                 ESP_LOGI(GATTC_TAG, "Read ok, handle = 0x%02x", p_data->read.handle);
@@ -358,6 +365,13 @@ int init_gatt_client(const QueueHandle_t queue) {
     if (local_mtu_ret){
         ESP_LOGE(GATTC_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
     }
+    /* Crear semáforo para controlar lecturas */
+    gattc_sem = xSemaphoreCreateBinary(); 
+    if ( gattc_sem == NULL ) {
+        ESP_LOGE(GATTC_TAG, "%s| Semaforo no creado!", __func__);
+        return -1;
+    }
+    xSemaphoreGive(gattc_sem);
     return 0;
 }
 
@@ -407,27 +421,37 @@ int gattc_set_chars(const uint16_t *chars, uint8_t chars_len) {
 
 /* Llamar una vez que se ha llamado a la función set_params */
 int nodo_gattc_start(void) {
-    gattc_sem = xSemaphoreCreateBinary(); 
-    if ( gattc_sem == NULL ) {
-        ESP_LOGE(GATTC_TAG, "%s| Semaforo no creado!", __func__);
-        return -1;
-    }
-    xSemaphoreGive(gattc_sem);
     if ( !client_init_ok ) {
         ESP_LOGE(GATTC_TAG, "%s| Cliente no inicializado!", __func__);
         return -1;
     }
+    xSemaphoreTake(gattc_sem, portMAX_DELAY);
     vTaskDelay(500);
     ESP_LOGI(GATTC_TAG, "%s| Start scanning!", __func__);
-    xSemaphoreTake(gattc_sem, portMAX_DELAY);
     esp_ble_gap_start_scanning(GATTC_SCAN_TIMEOUT);
-    xSemaphoreTake(gattc_sem, pdMS_TO_TICKS(GATTC_SCAN_TIMEOUT + 5000));
+    /* Tomar el semáforo solo para esperar */
+    xSemaphoreTake(gattc_sem, portMAX_DELAY);
+    xSemaphoreGive(gattc_sem);
     return 0;
 }
 
 /* Convertir los primeros dos bytes de un arreglo entero s/signo de 16b */
 static uint16_t u16_from_bytes(const uint8_t *bytes, uint8_t len) {
-    return len >= 2 ? ( ( ( 0L | bytes[1] ) << 8 ) | bytes[0] ) : 0;
+    return len <= 2 ? ( ( ( 0L | bytes[1] ) << 8 ) | bytes[0] ) : 0;
+}
+
+/* Convertir los primeros dos bytes de un arreglo entero s/signo de 32b */
+static uint32_t u32_from_bytes(const uint8_t *bytes, uint8_t len) {
+    if ( len <= 4 ) {
+        uint32_t aux, base = 0L;
+        for(uint8_t i = 0; i < len; i++) {
+            aux = 0L | ( bytes[i] << 8 * i );
+            base |= aux;
+        }
+        return base;
+    } else {
+        return 0;
+    }
 }
 
 void gattc_init_fail(void) {
@@ -455,6 +479,7 @@ int gattc_submit_chars(void) {
             disco_msg.status.esp_status = ESP_OK;
             discovery_ok = true;
         }
+        /* Evaluar antes del reinicio (discovery_cb) */
         xQueueSendToBack(out_queue, &disco_msg, portMAX_DELAY);
         esp_ble_gattc_close(gl_profile_tab[NODO_PROFILE_ID].gattc_if, gl_profile_tab[NODO_PROFILE_ID].conn_id);
         if ( discovery_ok == false ) { /* Liberar solamente si no se pudo descubrir -> no reinicio */
@@ -463,6 +488,7 @@ int gattc_submit_chars(void) {
             memset(instance_id, 0, INSTANCE_ID_VAL_LEN);
         }
         free(server_chars.chars[0].value_str);
+        xSemaphoreGive(gattc_sem);
         if ( discovery_cb != NULL ) { 
             discovery_cb( ( discovery_ok == true) ? DISCOVERY_CMPL : DISCOVERY_CMPL_FAIL, child_addr); /* Llamar al final por reinicio! */
         }
@@ -477,20 +503,27 @@ int gattc_submit_chars(void) {
                 case TEMP_CHAR_UUID:
                     ESP_LOGI(GATTC_TAG, "%s : %u", "TEMPERATURE", server_chars.chars[i].value_u16);
                     measure_data[i].type = TEMPERATURE;
+                    measure_data[i].value_u32 = server_chars.chars[i].value_u32;
                     break;
                 case HUMIDITY_CHAR_UUID:
                     measure_data[i].type = HUMIDITY;
                     ESP_LOGI(GATTC_TAG, "%s : %u", "HUMIDITY", server_chars.chars[i].value_u16);
+                    measure_data[i].value_u32 = server_chars.chars[i].value_u32;
                     break;
                 case LUX_CHAR_UUID:
                     measure_data[i].type = LIGHT;
                     ESP_LOGI(GATTC_TAG, "%s : %u", "LIGHT", server_chars.chars[i].value_u16);
+                    measure_data[i].value_u16 = server_chars.chars[i].value_u16;
+                    break;
+                case PH_CHAR_UUID:
+                    measure_data[i].type = PH;
+                    ESP_LOGI(GATTC_TAG, "%s : %u", "PH", server_chars.chars[i].value_u16);
+                    measure_data[i].value_u32 = server_chars.chars[i].value_u32;
                     break;
                 default:
                     ESP_LOGE(GATTC_TAG, "%s| UUID no encontrada!", __func__);
                     continue;
             }
-            measure_data[i].value = server_chars.chars[i].value_u16;
         }
         ws_meas_vec.dev_addr = child_addr_str;
         ESP_LOGI(GATTC_TAG, "Enviando datos...");

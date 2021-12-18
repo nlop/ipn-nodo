@@ -53,6 +53,7 @@ typedef struct gattc_char_t {
     union {
         uint8_t         *value_str;
         uint16_t        value_u16;
+        uint32_t        value_u32;
     };
 } gattc_char_t;
 

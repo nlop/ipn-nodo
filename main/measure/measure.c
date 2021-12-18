@@ -262,7 +262,7 @@ static int measure(enum meas_type_t type, QueueHandle_t out_queue) {
     adc_value /= SAMPLES;
     lm35_vol = esp_adc_cal_raw_to_voltage(adc_value, adc1_ch6_chars);
     mvector_data[0].type = TEMPERATURE;
-    mvector_data[0].value = lm35_vol;
+    mvector_data[0].value_u32 = lm35_vol;
     ESP_LOGI(MEAS_TAG, " LM35 => RAW = %d, mV = %d", adc_value, lm35_vol);
     // 2do Canal - Humedad
     adc_value = 0;
@@ -273,7 +273,7 @@ static int measure(enum meas_type_t type, QueueHandle_t out_queue) {
     hum_vol = esp_adc_cal_raw_to_voltage(adc_value, adc1_ch7_chars);
     ESP_LOGI(MEAS_TAG, " Humedad => RAW = %d, mV = %d", adc_value, hum_vol);
     mvector_data[1].type = HUMIDITY;
-    mvector_data[1].value = hum_vol;
+    mvector_data[1].value_u32 = hum_vol;
 #if CONFIG_TSL2561_ENABLED 
     if ( lux_meas_ok == true ) {
         static uint32_t lux;
@@ -283,7 +283,7 @@ static int measure(enum meas_type_t type, QueueHandle_t out_queue) {
         else
             ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
         mvector_data[2].type = LIGHT;
-        mvector_data[2].value = lux;
+        mvector_data[2].value_u32 = lux;
     }
 #elif CONFIG_BH1750_ENABLED
     if ( lux_meas_ok == true ) {
@@ -293,11 +293,12 @@ static int measure(enum meas_type_t type, QueueHandle_t out_queue) {
         else
             ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
         mvector_data[2].type = LIGHT;
-        mvector_data[2].value = lux;
+        mvector_data[2].value_u16 = lux;
     }
 #else
     mvector_data[2].type = LIGHT;
-    mvector_data[2].value = 0;
+    mvector_data[2].value_u16 = 0;
+    mvector_data[2].value_u32 = 0;
 #endif
     xQueueSendToBack(out_queue, &ws_msg, portMAX_DELAY);
     return 0;

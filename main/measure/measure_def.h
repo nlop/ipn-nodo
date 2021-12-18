@@ -7,7 +7,8 @@ enum measure_type_t { TEMPERATURE, HUMIDITY, PH, LIGHT };
 
 typedef struct measure_t {
     enum measure_type_t type; 
-    uint16_t value;
+    uint32_t value_u16;
+    uint16_t value_u32;
 } measure_t;
 
 typedef struct measure_vector_t {

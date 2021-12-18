@@ -25,13 +25,15 @@ cJSON *get_measure_vector_json(measure_vector_t *mvector) {
     for(uint8_t i = 0; i < mvector->len; i++) {
         cJSON *val = NULL;
         if ( mvector->data[i].type == HUMIDITY) {
-            float hum_perc = ( -10000.0 * mvector->data[i].value * 0.001 + 20800 ) / 133;
+            float hum_perc = ( -10000.0 * mvector->data[i].value_u32 * 0.001 + 20800 ) / 133;
             val = cJSON_CreateNumber(hum_perc); 
         } else if ( mvector->data[i].type == TEMPERATURE) {
-            float temp_float = mvector->data[i].value * 0.1;
+            float temp_float = mvector->data[i].value_u32 * 0.1;
             val = cJSON_CreateNumber(temp_float); 
+        } else if ( mvector->data[i].type == LIGHT) {
+            val = cJSON_CreateNumber(mvector->data[i].value_u16);
         } else {
-            val = cJSON_CreateNumber(mvector->data[i].value); 
+            val = cJSON_CreateNumber(mvector->data[i].value_u32); 
         }
         if ( val != NULL ) {
             cJSON_AddItemToObject(json_obj, get_meas_type_str(mvector->data[i].type), val);
