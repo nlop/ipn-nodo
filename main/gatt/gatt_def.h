@@ -10,6 +10,7 @@
 #define TEST_DISCOVERY_UUID         0x2A23
 #define HUMIDITY_CHAR_UUID          0x2A6F
 #define LUX_CHAR_UUID               0x2AFB
+#define PH_CHAR_UUID                0x2AF9      /* SIG Generic Char UUID */
 #define INSTANCE_ID_VAL_LEN         16
 
 /** Enums **/

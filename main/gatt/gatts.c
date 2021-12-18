@@ -311,16 +311,16 @@ void gatt_task(void *pvParameters) {
                 measure_t measure = msg.meas_vector->measure->data[i];
                 switch (measure.type) {
                     case TEMPERATURE:
-                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_TEMP_VAL], sizeof(int32_t), (uint8_t *) &measure.value);
+                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_TEMP_VAL], sizeof(int32_t), (uint8_t *) &measure.value_u32);
                         break;
                     case HUMIDITY:
-                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_HUM_VAL], sizeof(int32_t), (uint8_t *) &measure.value);
+                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_HUM_VAL], sizeof(int32_t), (uint8_t *) &measure.value_u32);
                         break;
                     case LIGHT:
-                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_LUM_VAL], sizeof(int32_t), (uint8_t *) &measure.value);
+                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_LUM_VAL], sizeof(int16_t), (uint8_t *) &measure.value_u16);
                         break;
                     case PH:
-                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_PH_VAL], sizeof(int32_t), (uint8_t *) &measure.value);
+                        esp_ble_gatts_set_attr_value(nodo_service_handles[ID_CHAR_PH_VAL], sizeof(int32_t), (uint8_t *) &measure.value_u32);
                         break;
                     default:
                         ESP_LOGE(GATT_TASK_TAG, "Error: measure type incorrecto");

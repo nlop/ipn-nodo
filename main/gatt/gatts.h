@@ -46,7 +46,7 @@ static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t temperature_uuid = TEMP_CHAR_UUID;        // SIG GATT Characteristics and Object Type
 static const uint16_t humidity_uuid= HUMIDITY_CHAR_UUID; 
 static const uint16_t lux_uuid = LUX_CHAR_UUID;
-static const uint16_t generic_uuid = 0x2AF9; // pH
+static const uint16_t ph_char_uuid = PH_CHAR_UUID; // pH
 static const uint16_t system_id_uuid = TEST_DISCOVERY_UUID;
 /* Characteristics formats (<<< LSB ----- MSB >>>) */
 static const uint8_t temp_presentation_format[7] =  {0x10, -1, 0x2f, 0x27, 0x01, 0x00, 0x00};
@@ -187,8 +187,8 @@ static esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
                 ESP_UUID_LEN_16,
                 (uint8_t *) &lux_uuid, 
                 ESP_GATT_PERM_READ,
-                sizeof(int32_t),
-                sizeof(int32_t),
+                sizeof(int16_t),
+                sizeof(int16_t),
                 (uint8_t *) &init_value 
             }},
     [ID_CHAR_LUM_FMT] =
@@ -215,7 +215,7 @@ static esp_gatts_attr_db_t gatt_db[DB_LEN] =  {
         {{ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16,
-                (uint8_t *) &generic_uuid, 
+                (uint8_t *) &ph_char_uuid, 
                 ESP_GATT_PERM_READ,
                 sizeof(int32_t),
                 sizeof(int32_t),
