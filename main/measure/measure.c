@@ -19,12 +19,8 @@ static measure_t mvector_data[3];
 static measure_vector_t mvector = { .len = 3, .data = mvector_data };
 static ws_meas_vector_t ws_mvector = { .measure = &mvector };
 static ws_queue_msg_t ws_msg = { .meas_vector = &ws_mvector  };
-#if CONFIG_TSL2561_ENABLED || CONFIG_BH1750_ENABLED
+#if CONFIG_BH1750_ENABLED
 static bool lux_meas_ok = false;
-#endif
-#if CONFIG_TSL2561_ENABLED 
-static tsl2561_t dev;
-#elif CONFIG_BH1750_ENABLED 
 static i2c_dev_t dev;
 #endif
 
@@ -76,29 +72,13 @@ void measure_task(void *pvParameters) {
 static int init_measure_(void) {
     // Preparar dispositivos
     for (int i = 0; i < INIT_I2C_ATTEMPTS; i++ ) {
-#if CONFIG_TSL2561_ENABLED || CONFIG_BH1750_ENABLED
+#if CONFIG_BH1750_ENABLED
         /* Inicializar el bus i2c */
         if ( i2cdev_init() != ESP_OK ) {
             ESP_LOGE(MEAS_TAG, "%s Error iniciando i2c!", __func__);
             vTaskDelay(pdMS_TO_TICKS(500));
             continue;
         };
-#endif
-#if CONFIG_TSL2561_ENABLED 
-        ESP_LOGI(MEAS_TAG, "Utilizando sensor TSL2561!");
-        memset(&dev, 0, sizeof(tsl2561_t));
-        if( tsl2561_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO) != ESP_OK ) {
-            ESP_LOGE(MEAS_TAG, "%s Error iniciando TSL2561 (desc)!", __func__);
-            vTaskDelay(pdMS_TO_TICKS(500));
-            continue;
-        }
-        if( tsl2561_init(&dev) != ESP_OK ) {
-            ESP_LOGE(MEAS_TAG, "%s Error iniciando TSL2561 (init)!", __func__);
-            vTaskDelay(pdMS_TO_TICKS(500));
-            continue;
-        }
-        ESP_LOGI(MEAS_TAG, "Found TSL2561 in package %s\n", dev.package_type == TSL2561_PACKAGE_CS ? "CS" : "T/FN/CL");
-#elif CONFIG_BH1750_ENABLED 
         ESP_LOGI(MEAS_TAG, "Utilizando sensor BH1750!");
         memset(&dev, 0, sizeof(i2c_dev_t));
         ESP_ERROR_CHECK(bh1750_init_desc(&dev, ADDR, 0, SDA_GPIO, SCL_GPIO));
@@ -274,18 +254,7 @@ static int measure(enum meas_type_t type, QueueHandle_t out_queue) {
     ESP_LOGI(MEAS_TAG, " Humedad => RAW = %d, mV = %d", adc_value, hum_vol);
     mvector_data[1].type = HUMIDITY;
     mvector_data[1].value_u32 = hum_vol;
-#if CONFIG_TSL2561_ENABLED 
-    if ( lux_meas_ok == true ) {
-        static uint32_t lux;
-        // TSL2561
-        if ((res = tsl2561_read_lux(&dev, &lux)) != ESP_OK)
-            ESP_LOGE(MEAS_TAG, "Error leyendo dispositivo");
-        else
-            ESP_LOGI(MEAS_TAG, "Lux: %u", lux);
-        mvector_data[2].type = LIGHT;
-        mvector_data[2].value_u32 = lux;
-    }
-#elif CONFIG_BH1750_ENABLED
+#if CONFIG_BH1750_ENABLED
     if ( lux_meas_ok == true ) {
         static uint16_t lux;
         if ((res = bh1750_read(&dev, &lux)) != ESP_OK)

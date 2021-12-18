@@ -51,9 +51,6 @@ menu "IPN-NODO Menu"
         config VREF
             int "Voltage de referencia para el ADC (V)"
             default 1100
-        config TSL2561_ENABLED
-            bool "Utilizar el sensor TSL2561"
-            default n
         config BH1750_ENABLED
             bool "Utilizar el sensor BH1750"
             default n
