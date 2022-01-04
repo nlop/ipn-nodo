@@ -42,12 +42,12 @@ x = range(1, len(patron_meas) + 1)
 err_bar_x = range(1, len(meas_grp) + 1)
 fig, ax = plt.subplots()
 #ax.errorbar(err_bar_x, err_bar_y, yerr = err_bar_xerr, fmt = 'o')
-ax.scatter(x, patron_meas, marker='o', c = 'red', linewidth = 1.6, label='Patron');
-ax.scatter(x, disp_meas,  marker='o',c = 'blue', linewidth = 1.6, label='Dispositivo');
-ax.set_xlabel('Muestras')
-ax.set_ylabel('Temperatura (°C)')
+ax.plot(disp_meas, patron_meas, '.b');
+ax.plot([0, max(patron_meas)], [0, max(patron_meas)] , '--', color = '#999999');
+#ax.scatter(x, disp_meas,  marker='o',c = 'blue', linewidth = 1.6, label='Dispositivo');
+ax.set_xlabel('Patrón')
+ax.set_ylabel('Dispositivo')
 ax.set_title('Calibración LM35')
-ax.legend()
 #ax.tick_params(which = 'minor',  bottom = False, left = False)
 ax.grid(which = 'major', color = '#404040', linewidth = 0.7)
 ax.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
