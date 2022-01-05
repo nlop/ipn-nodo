@@ -2,8 +2,6 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, InsetPosition, mark_inset, zoomed_inset_axes
-
 import sys
 
 def measSort(measTup):
@@ -46,16 +44,16 @@ ax.plot(xSamplesAll, yMeasDev, '^', color = 'orange', label = 'Dispositivo');
 
 #ax.scatter(x, disp_meas,  marker='o',c = 'blue', linewidth = 1.6, label='Dispositivo');
 ax.set_xlabel('Muestras')
-ax.set_ylabel('Temperatura')
-ax.set_title('Calibración LM35')
+ax.set_ylabel('Humedad del suelo')
+ax.set_title('Calibración HW395')
 #ax.tick_params(which = 'minor',  bottom = False, left = False)
 ax.grid(which = 'major', color = '#404040', linewidth = 0.7)
 ax.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
 ax.minorticks_on()
 plt.xticks(xSamples)
-ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2f}°C'))
+ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.0f}%'))
 #ax.xaxis.set_major_locator(ticker.MaxNLocator(len(xSamples), integer = True))
 ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
 ax.legend()
 plt.show()
-#fig.savefig('lm35.png', dpi = 300.0)
+#fig.savefig('hw390.png', dpi = 300.0)

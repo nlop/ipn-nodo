@@ -3,11 +3,11 @@ import sys
 from itertools import groupby
 import numpy as np
 import matplotlib.pyplot as plt
-
+from matplotlib import ticker
 def sortRSSI(rssiTup):
     return rssiTup[0]
 colors = ['','r','b','g']
-labels = ['', 'Abierto', 'Cerrado']
+labels = ['', 'Entorno cerrado', 'Entorno abierto']
 measRaw = []
 if len(sys.argv) < 2:
     print('Faltan argumentos')
@@ -29,5 +29,14 @@ for i in range(1, len(sys.argv)):
         yRSSI.append(rssiMean)
     ax.plot(xDist, yRSSI, 's-{color}'.format(color = colors[i]), label =
             labels[i])
+ax.grid(which = 'major', color = '#404040', linewidth = 0.7)
+ax.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
+ax.minorticks_on()
+ax.set_xlabel('Distancia (m)')
+ax.set_ylabel('RSSI')
+ax.set_title('Caracterización señal WiFi')
+ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
+plt.xticks(xDist)
 ax.legend()
-plt.show()
+#plt.show()
+fig.savefig('rssi_wifi.png', dpi = 300)

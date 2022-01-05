@@ -15,6 +15,7 @@ if len(sys.argv) != 2:
 yPatMean = []
 yDevMean = []
 yDevStd = []
+
 fig, ax = plt.subplots()
 with open(sys.argv[1]) as csvfile:
     reader = csv.reader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
@@ -34,9 +35,9 @@ for i in range(int(len(measRaw)/10)):
     yDevStd.append(np.std(measDev))
 xSamples = range(1, len(yPatMean) + 1)
 ax.errorbar(xSamples, yDevMean, yerr = yDevStd, fmt = 'o', label =
-                'Dispositivo')
+                'Dispositivo', capsize = 5, markeredgewidth = 1)
 ax.plot(xSamples, yPatMean,'o', color =
-            'orange', label = 'Patron')
+            'orange', label = 'Patron (media)')
 ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2f}°C'))
 ax.legend()
 plt.show()
