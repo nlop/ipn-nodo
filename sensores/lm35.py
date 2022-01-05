@@ -2,7 +2,7 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, InsetPosition, mark_inset, zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, InsetPosition, mark_inset
 
 import sys
 
@@ -56,6 +56,82 @@ plt.xticks(xSamples)
 ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2f}°C'))
 #ax.xaxis.set_major_locator(ticker.MaxNLocator(len(xSamples), integer = True))
 ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
+# Inset
+groupI = 3
+ax2 = plt.axes([0,0,1,1])
+ip = InsetPosition(ax, [.448,.58,0.1,0.3])
+ax2.set_axes_locator(ip)
+#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
+#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
+ax2.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
+ax2.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
+ax2.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
+
+ax2.grid(which = 'major', color = '#404040', linewidth = 0.7)
+ax2.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
+ax2.minorticks_on()
+groupI = 1
+ax3 = plt.axes([0,0,1,1])
+ip = InsetPosition(ax, [.1405,.4,0.1,0.3])
+ax3.set_axes_locator(ip)
+#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
+#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
+ax3.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
+ax3.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
+ax3.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
+
+ax3.grid(which = 'major', color = '#404040', linewidth = 0.7)
+ax3.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
+ax3.minorticks_on()
+
+groupI = 4
+ax4 = plt.axes([0,0,1,1])
+ip = InsetPosition(ax, [.602,.12,0.1,0.3])
+ax4.set_axes_locator(ip)
+#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
+#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
+ax4.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
+ax4.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
+ax4.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
+ax4.grid(which = 'major', color = '#404040', linewidth = 0.7)
+ax4.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
+ax4.minorticks_on()
+
+groupI = 6
+ax5 = plt.axes([0,0,1,1])
+ip = InsetPosition(ax, [.908,.58,0.09,0.3])
+ax5.set_axes_locator(ip)
+#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
+#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
+ax5.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
+ax5.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
+ax5.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
+ax5.grid(which = 'major', color = '#404040', linewidth = 0.7)
+ax5.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
+ax5.minorticks_on()
+
 ax.legend()
 plt.show()
+#fig.savefig('lm35.png', dpi = 1200.0)
+
+# ax.minorticks_on()
+# plt.xticks(xSamples)
+# ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2f}°C'))
+# #ax.xaxis.set_major_locator(ticker.MaxNLocator(len(xSamples), integer = True))
+# ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
+# # Inset
+# ax2 = plt.axes([0,0,1,1])
+# ip = InsetPosition(ax, [0.8,0.1,0.1,0.3])
+# ax2.set_axes_locator(ip)
+# mark_inset(ax, ax2, loc1=1, loc2=2, fc="none", ec='0.5')
+# #ax2.plot(xSamplesAll[60:70], yMeasDev[60:70], ls = 'none', marker = '^', color = 'orange')
+# ax2.errorbar([7], yDevMean[6], yerr = yDevStd[6], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
+# ax2.plot([7], yMeasPat[6], marker = 's', color = 'orange')
+
+# ax2.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2f}°C'))
+# #ax.xaxis.set_major_locator(ticker.MaxNLocator(len(xSamples), integer = True))
+# ax2.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
+
+# ax.legend()
+# plt.show()
 #fig.savefig('lm35.png', dpi = 300.0)
