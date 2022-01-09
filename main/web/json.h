@@ -2,6 +2,7 @@
 #define WEB_JSON_H
 
 #include "esp_log.h"
+#include <math.h>
 #include "cJSON.h"
 #include "esp_err.h"
 #include "utils/time.h"
