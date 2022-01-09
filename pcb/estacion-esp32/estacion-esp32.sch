@@ -1,0 +1,335 @@
+EESchema Schematic File Version 4
+EELAYER 30 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L Device:C C1
+U 1 1 6191D931
+P 3800 3350
+F 0 "C1" H 3915 3396 50  0000 L CNN
+F 1 "100nF" H 3915 3305 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D6.0mm_W2.5mm_P5.00mm" H 3838 3200 50  0001 C CNN
+F 3 "~" H 3800 3350 50  0001 C CNN
+	1    3800 3350
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	3800 3200 3800 3150
+Wire Wire Line
+	3050 2700 3050 2850
+$Comp
+L power:+3.3V #PWR06
+U 1 1 6199F28D
+P 4600 2350
+F 0 "#PWR06" H 4600 2200 50  0001 C CNN
+F 1 "+3.3V" H 4615 2523 50  0000 C CNN
+F 2 "" H 4600 2350 50  0001 C CNN
+F 3 "" H 4600 2350 50  0001 C CNN
+	1    4600 2350
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+3.3V #PWR01
+U 1 1 61A1B967
+P 1750 3150
+F 0 "#PWR01" H 1750 3000 50  0001 C CNN
+F 1 "+3.3V" H 1765 3323 50  0000 C CNN
+F 2 "" H 1750 3150 50  0001 C CNN
+F 3 "" H 1750 3150 50  0001 C CNN
+	1    1750 3150
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:Battery BT1
+U 1 1 61A2DFD1
+P 1750 3450
+F 0 "BT1" H 1858 3496 50  0000 L CNN
+F 1 "Battery" H 1858 3405 50  0000 L CNN
+F 2 "Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical" V 1750 3510 50  0001 C CNN
+F 3 "~" V 1750 3510 50  0001 C CNN
+	1    1750 3450
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1750 3150 1750 3250
+$Comp
+L power:+3.3V #PWR04
+U 1 1 61A38DAA
+P 3050 2700
+F 0 "#PWR04" H 3050 2550 50  0001 C CNN
+F 1 "+3.3V" H 3065 2873 50  0000 C CNN
+F 2 "" H 3050 2700 50  0001 C CNN
+F 3 "" H 3050 2700 50  0001 C CNN
+	1    3050 2700
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3800 3500 3800 3550
+$Comp
+L power:+3.3V #PWR05
+U 1 1 61A4474A
+P 3800 3850
+F 0 "#PWR05" H 3800 3700 50  0001 C CNN
+F 1 "+3.3V" H 3815 4023 50  0000 C CNN
+F 2 "" H 3800 3850 50  0001 C CNN
+F 3 "" H 3800 3850 50  0001 C CNN
+	1    3800 3850
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR03
+U 1 1 61A4590B
+P 3500 3750
+F 0 "#PWR03" H 3500 3500 50  0001 C CNN
+F 1 "GND" H 3505 3577 50  0000 C CNN
+F 2 "" H 3500 3750 50  0001 C CNN
+F 3 "" H 3500 3750 50  0001 C CNN
+	1    3500 3750
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	3800 4150 3800 3850
+$Comp
+L Sensor_Temperature:LM35-LP U1
+U 1 1 61A8A3B1
+P 3050 3150
+F 0 "U1" H 2721 3196 50  0000 R CNN
+F 1 "LM35-LP" H 2721 3105 50  0000 R CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x03_P2.54mm_Horizontal" H 3100 2900 50  0001 L CNN
+F 3 "http://www.ti.com/lit/ds/symlink/lm35.pdf" H 3050 3150 50  0001 C CNN
+	1    3050 3150
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3450 3150 3800 3150
+$Comp
+L ipn-nodo:ESP32_Devkitc_V4_L J1
+U 1 1 619658C4
+P 5350 3650
+F 0 "J1" H 5300 4700 50  0000 L CNN
+F 1 "ESP32_Devkitc_V4_L" H 5000 4900 50  0000 L CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x19_P2.54mm_Vertical" H 5350 3650 50  0001 C CNN
+F 3 "~" H 5350 3650 50  0001 C CNN
+	1    5350 3650
+	1    0    0    -1  
+$EndComp
+$Comp
+L ipn-nodo:HW390 S1
+U 1 1 6196AAAE
+P 3050 4150
+F 0 "S1" H 2983 4525 50  0000 C CNN
+F 1 "HW390" H 2983 4434 50  0000 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical" H 3050 4150 50  0001 C CNN
+F 3 "" H 3050 4150 50  0001 C CNN
+	1    3050 4150
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3150 4150 3800 4150
+Connection ~ 3800 3150
+Wire Wire Line
+	5150 3250 4400 3250
+Wire Wire Line
+	4000 3250 4000 4300
+Wire Wire Line
+	3150 4300 4000 4300
+Wire Wire Line
+	3150 4000 3300 4000
+Wire Wire Line
+	3300 4000 3300 3550
+$Comp
+L Device:C C2
+U 1 1 6193B7B3
+P 4400 3750
+F 0 "C2" H 4515 3796 50  0000 L CNN
+F 1 "100nF" H 4515 3705 50  0000 L CNN
+F 2 "Capacitor_THT:C_Disc_D6.0mm_W2.5mm_P5.00mm" H 4438 3600 50  0001 C CNN
+F 3 "~" H 4400 3750 50  0001 C CNN
+	1    4400 3750
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	4400 3600 4400 3250
+Connection ~ 4400 3250
+Wire Wire Line
+	4400 3250 4000 3250
+$Comp
+L ipn-nodo:ESP32_Devkitc_V4_R J2
+U 1 1 619900DD
+P 6500 3650
+F 0 "J2" H 6500 4700 50  0000 C CNN
+F 1 "ESP32_Devkitc_V4_R" H 6550 4900 50  0000 C CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x19_P2.54mm_Vertical" H 6500 3650 50  0001 C CNN
+F 3 "~" H 6500 3650 50  0001 C CNN
+	1    6500 3650
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3300 3550 3500 3550
+Wire Wire Line
+	3800 3150 5150 3150
+Wire Wire Line
+	3300 3550 3050 3550
+Connection ~ 3300 3550
+Wire Wire Line
+	3050 3450 3050 3550
+$Comp
+L ipn-nodo:SENSOR-PH S2
+U 1 1 619787CD
+P 4000 4850
+F 0 "S2" H 4092 5325 50  0000 C CNN
+F 1 "SENSOR-PH" H 4092 5234 50  0000 C CNN
+F 2 "Connector_JST:JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical" H 3900 4850 50  0001 C CNN
+F 3 "" H 3900 4850 50  0001 C CNN
+	1    4000 4850
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	4400 4600 4100 4600
+$Comp
+L power:+3.3V #PWR07
+U 1 1 61991A40
+P 4500 4400
+F 0 "#PWR07" H 4500 4250 50  0001 C CNN
+F 1 "+3.3V" H 4515 4573 50  0000 C CNN
+F 2 "" H 4500 4400 50  0001 C CNN
+F 3 "" H 4500 4400 50  0001 C CNN
+	1    4500 4400
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4500 4400 4500 4750
+Wire Wire Line
+	4500 4750 4100 4750
+Wire Wire Line
+	5150 3350 4650 3350
+Wire Wire Line
+	4650 3350 4650 4900
+Wire Wire Line
+	4650 4900 4100 4900
+Text GLabel 4400 5050 2    50   Output ~ 0
+PH_EN
+Text GLabel 5000 3450 0    50   Output ~ 0
+PH_EN
+Wire Wire Line
+	5150 2750 4600 2750
+Wire Wire Line
+	4600 2750 4600 2350
+$Comp
+L power:GND #PWR08
+U 1 1 619BD587
+P 4900 4800
+F 0 "#PWR08" H 4900 4550 50  0001 C CNN
+F 1 "GND" H 4905 4627 50  0000 C CNN
+F 2 "" H 4900 4800 50  0001 C CNN
+F 3 "" H 4900 4800 50  0001 C CNN
+	1    4900 4800
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	4100 5050 4400 5050
+$Comp
+L power:GND #PWR02
+U 1 1 619CDBC1
+P 1750 3900
+F 0 "#PWR02" H 1750 3650 50  0001 C CNN
+F 1 "GND" H 1755 3727 50  0000 C CNN
+F 2 "" H 1750 3900 50  0001 C CNN
+F 3 "" H 1750 3900 50  0001 C CNN
+	1    1750 3900
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	1750 3650 1750 3900
+Wire Wire Line
+	3500 3750 3500 3550
+Connection ~ 3500 3550
+Wire Wire Line
+	3500 3550 3800 3550
+Wire Wire Line
+	4400 3900 4400 4600
+Wire Wire Line
+	4400 4600 4900 4600
+Connection ~ 4400 4600
+Wire Wire Line
+	4900 4800 4900 4600
+$Comp
+L power:GND #PWR0101
+U 1 1 61A05EE1
+P 7100 2950
+F 0 "#PWR0101" H 7100 2700 50  0001 C CNN
+F 1 "GND" H 7105 2777 50  0000 C CNN
+F 2 "" H 7100 2950 50  0001 C CNN
+F 3 "" H 7100 2950 50  0001 C CNN
+	1    7100 2950
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	6700 2750 7100 2750
+Wire Wire Line
+	7100 2750 7100 2950
+Wire Wire Line
+	5150 3450 5000 3450
+Wire Wire Line
+	7900 3550 7900 3800
+$Comp
+L power:GND #PWR010
+U 1 1 61995A28
+P 7900 3800
+F 0 "#PWR010" H 7900 3550 50  0001 C CNN
+F 1 "GND" H 7905 3627 50  0000 C CNN
+F 2 "" H 7900 3800 50  0001 C CNN
+F 3 "" H 7900 3800 50  0001 C CNN
+	1    7900 3800
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+3.3V #PWR09
+U 1 1 61994929
+P 7900 3250
+F 0 "#PWR09" H 7900 3100 50  0001 C CNN
+F 1 "+3.3V" H 7915 3423 50  0000 C CNN
+F 2 "" H 7900 3250 50  0001 C CNN
+F 3 "" H 7900 3250 50  0001 C CNN
+	1    7900 3250
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	7750 3550 7900 3550
+$Comp
+L ipn-nodo:BH1750 S3
+U 1 1 619934E2
+P 7400 3550
+F 0 "S3" H 7400 3875 50  0000 C CNN
+F 1 "BH1750" H 7400 3784 50  0000 C CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x04_P2.54mm_Vertical" H 7100 3550 50  0001 C CNN
+F 3 "https://datasheet.octopart.com/BH1750FVI-TR-Rohm-datasheet-25365051.pdf" H 7100 3550 50  0001 C CNN
+	1    7400 3550
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	6700 3450 7050 3450
+Wire Wire Line
+	6700 3550 7050 3550
+Wire Wire Line
+	7900 3250 7900 3450
+Wire Wire Line
+	7900 3450 7750 3450
+Text Notes 7350 7500 0    67   ~ 0
+Estación de medición con ESP32
+Text Notes 8100 7650 0    39   ~ 0
+02/12/2021\n
+Text Notes 10600 7650 0    50   ~ 0
+1.0
+$EndSCHEMATC

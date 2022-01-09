@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name estacion-esp32)(type KiCad)(uri ${KIPRJMOD}/estacion-esp32.pretty)(options "")(descr ""))
+)

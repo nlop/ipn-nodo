@@ -1,0 +1,28 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP BH1750
+D Digital 16bit Serial Ambient Light Sensor IC
+F https://datasheet.octopart.com/BH1750FVI-TR-Rohm-datasheet-25365051.pdf
+$ENDCMP
+#
+$CMP ESP32_Devkitc_V4_L
+D Generic connector, single row, 01x19, script generated (kicad-library-utils/schlib/autogen/connector/)
+K connector
+F ~
+$ENDCMP
+#
+$CMP ESP32_Devkitc_V4_R
+D Generic connector, single row, 01x19, script generated (kicad-library-utils/schlib/autogen/connector/)
+K connector
+F ~
+$ENDCMP
+#
+$CMP HW390
+D Capacitive Soil Moisture Sensor
+$ENDCMP
+#
+$CMP SENSOR-PH
+D Sensor PH
+$ENDCMP
+#
+#End Doc Library
