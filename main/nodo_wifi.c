@@ -7,6 +7,7 @@
  */
 
 int conn_retry_num = 0;
+static int ap_cmp(const void *ap1,const void *ap2);
 
 /*
  * Secuencia de inicialización del controlador WiFI
@@ -69,17 +70,26 @@ nodo_ap_scan_results_t nodo_wifi_scan() {
             res.results = ap_info;
             for (size_t i = 0; (i < MAX_AP_SCAN_SIZE) && (i < ap_count); i++) {
                 ESP_LOGI(WIFI_TAG, "SSID \t\t%s", ap_info[i].ssid);
-                ESP_LOGI(WIFI_TAG, "RSSI \t\t%d", ap_info[i].rssi);
+                //ESP_LOGI(WIFI_TAG, "RSSI \t\t%d", ap_info[i].rssi);
                 //print_auth_mode(ap_info[i].authmode);
                 //if (ap_info[i].authmode != WIFI_AUTH_WEP) {
                 //    print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
                 //}
                 //ESP_LOGI(TAG, "Channel \t\t%d\n", ap_info[i].primary);
             }
+            /** Ordenar **/
+            qsort(res.results, ap_count, sizeof(wifi_ap_record_t), ap_cmp);
             break;
         }
     }
     return res;
+}
+
+/* Función auxiliar para comparar entradas de APs, utilizada para ordenar */
+static int ap_cmp(const void *ap1, const void *ap2) {
+    wifi_ap_record_t *ap1_aux = (wifi_ap_record_t *) ap1;
+    wifi_ap_record_t *ap2_aux = (wifi_ap_record_t *) ap2;
+    return ap1_aux->rssi > ap2_aux->rssi;
 }
 
 void nodo_wifi_set_credentials(uint8_t *ssid, uint8_t *psk) {
