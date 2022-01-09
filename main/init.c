@@ -122,6 +122,7 @@ void nodo_init_recv_task(void *pvParameters) {
                     free(msg_buffer.msg_psk.psk);
                     ESP_LOGI(INIT_TAG, "MSG_PSK data: %s, len = %zu", psk, msg_buffer.msg_psk.len);
                     // TODO: Combinar traza de MSG_SSID/PSK en una sola y leer con FSM
+                    vTaskDelay(pdMS_TO_TICKS(2500));
                     nodo_wifi_set_credentials(ssid, psk); 
                     break;
                 case MSG_INIT:
