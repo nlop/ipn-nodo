@@ -45,7 +45,7 @@ xSamples = range(1, int(len(rawMeas) / 10) + 1)
 fig, ax = plt.subplots()
 #ax.errorbar(err_bar_x, err_bar_y, yerr = err_bar_xerr, fmt = 'o')
 ax.errorbar(xSamples, yDevMean, yerr = yDevStd, fmt = 'o', label =
-                'Desviación', capsize = 8, markeredgewidth = 1)
+                'Desviación', capsize = 5, markeredgewidth = 1)
 ax.plot(xSamples, yMeasPat, 's', color = 'red', label = 'Patron (media)',
         markersize = 5);
 ax.plot(xSamplesAll, yMeasDev, '^', color = 'orange', label = 'Dispositivo',
@@ -53,23 +53,22 @@ ax.plot(xSamplesAll, yMeasDev, '^', color = 'orange', label = 'Dispositivo',
 
 #ax.scatter(x, disp_meas,  marker='o',c = 'blue', linewidth = 1.6, label='Dispositivo');
 ax.set_xlabel('Muestras', fontsize = 'large')
-ax.set_ylabel('Temperatura', fontsize = 'large')
-ax.set_title('Calibración LM35', fontsize = 'x-large')
+ax.set_ylabel('Lux', fontsize = 'large')
+ax.set_title('Calibración BH1750', fontsize = 'x-large')
 #ax.tick_params(which = 'minor',  bottom = False, left = False)
 ax.grid(which = 'major', color = '#404040', linewidth = 0.7)
 ax.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
 ax.minorticks_on()
 plt.xticks(xSamples)
-ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.1f}°C'))
+#ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2f}°C'))
 #ax.xaxis.set_major_locator(ticker.MaxNLocator(len(xSamples), integer = True))
 ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
 # Inset
-groupI = 3
+groupI = 0
 ax2 = plt.axes([0,0,1,1])
-ip = InsetPosition(ax, [.448,.58,0.1,0.3])
+ip = InsetPosition(ax, [.15,.2,0.1,0.3])
 ax2.set_axes_locator(ip)
-#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
-#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
+mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
 ax2.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
 ax2.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
 ax2.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
@@ -78,27 +77,26 @@ ax2.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
 ax2.minorticks_on()
 ax2.set_xticks([])
 
+# Inset
 groupI = 1
 ax3 = plt.axes([0,0,1,1])
-ip = InsetPosition(ax, [.1405,.4,0.1,0.3])
+ip = InsetPosition(ax, [.45,.5,0.1,0.3])
 ax3.set_axes_locator(ip)
-#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
-#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
+mark_inset(ax, ax3, loc1=2, loc2=4, fc="none", ec='0.5')
 ax3.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
 ax3.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
 ax3.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
-
 ax3.grid(which = 'major', color = '#404040', linewidth = 0.7)
 ax3.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
 ax3.minorticks_on()
 ax3.set_xticks([])
 
-groupI = 4
+# Inset
+groupI = 2
 ax4 = plt.axes([0,0,1,1])
-ip = InsetPosition(ax, [.602,.12,0.1,0.3])
+ip = InsetPosition(ax, [.8,.65,0.1,0.3])
 ax4.set_axes_locator(ip)
-#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
-#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
+mark_inset(ax, ax4, loc1=2, loc2=4, fc="none", ec='0.5')
 ax4.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
 ax4.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
 ax4.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
@@ -107,20 +105,6 @@ ax4.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
 ax4.minorticks_on()
 ax4.set_xticks([])
 
-groupI = 6
-ax5 = plt.axes([0,0,1,1])
-ip = InsetPosition(ax, [.908,.58,0.09,0.3])
-ax5.set_axes_locator(ip)
-#mark_inset(ax, ax2, loc1=2, loc2=4, fc="none", ec='0.5')
-#ax2.errorbar([1], yDevMean[0], yerr = yDevStd[0])
-ax5.plot(xSamplesAll[groupI * 10 :groupI * 10 + 10], yMeasDev[groupI * 10: groupI*10 + 10], ls = 'none', marker = '^', color = 'orange')
-ax5.errorbar(groupI + 1, yDevMean[groupI], yerr = yDevStd[groupI], marker = 'o', color = 'blue', capsize = 5, markeredgewidth = 1)
-ax5.plot(groupI + 1, yMeasPat[groupI], 's', color = 'red');
-ax5.grid(which = 'major', color = '#404040', linewidth = 0.7)
-ax5.grid(which = 'minor', color = '#C0C0C0', linewidth = 0.3)
-ax5.minorticks_on()
-ax5.set_xticks([])
-
 ax.legend()
 #plt.show()
-fig.savefig('lm35.png', dpi = 160.0)
+fig.savefig('bh1750.png', dpi = 160.0)
