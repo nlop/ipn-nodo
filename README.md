@@ -1,6 +1,6 @@
 # ipn-nodo
 
-![Sample units](doc/img/img1.png)
+![Sample units](doc/img/img1.jpg)
 Project files for the project _Remote Plant Monitoring System_ (TT2020-B031).
 Includes both the ESP32's source code and KiCad files for the circuit and PCB
 designs.
